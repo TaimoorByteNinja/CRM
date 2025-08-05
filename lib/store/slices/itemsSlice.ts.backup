@@ -1,0 +1,420 @@
+import { createSlice, createAsyncThunk, PayloadAction, createSelector } from '@reduxjs/toolkit'
+import { apiClient } from '../../api-client';
+      sku: data.sku,
+      sale_price: data.sale_price,
+      price: data.sale_price,
+      purchase_price: data.purchase_price,
+      cost: data.purchase_price,
+      current_stock: data.stock,
+      stock: data.stock,
+      opening_stock: data.stock,
+      minimum_stock: data.min_stock,
+      minStock: data.min_stock,
+      description: data.description,
+      tax_rate: data.tax_rate,
+      gst_rate: `${data.tax_rate}%`,
+      status: data.status,
+      is_active: data.status === 'active',
+      created_at: data.created_at,
+      updated_at: data.updated_at,
+      category: 'General',
+      unit: 'PCS',
+      hsn_code: '',
+      hsn: '',
+      taxable: true,
+      godown: '',
+      barcode: '',
+      supplier: '',
+      totalSold: 0,
+      type: data.type,
+      category_id: '',
+      supplier_id: '',
+      unit_id: ''
+    };
+  },
+
+  async update(id: string, itemData: any) {
+    const dbData = {
+      name: itemData.item_name || itemData.name,
+      sku: itemData.item_code || itemData.sku,
+      sale_price: itemData.sale_price || itemData.price,
+      purchase_price: itemData.purchase_price || itemData.cost,
+      stock: itemData.current_stock || itemData.stock,
+      min_stock: itemData.minimum_stock || itemData.minStock,
+      description: itemData.description,
+      tax_rate: itemData.tax_rate || parseFloat(itemData.gst_rate) || 0,
+      status: itemData.is_active !== false ? 'active' : 'inactive'
+    };
+
+    const { data, error } = await supabase
+      .from('items')
+      .update(dbData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    
+    return {
+      id: data.id,
+      item_name: data.name,
+      name: data.name,
+      item_code: data.sku,
+      sku: data.sku,
+      sale_price: data.sale_price,
+      price: data.sale_price,
+      purchase_price: data.purchase_price,
+      cost: data.purchase_price,
+      current_stock: data.stock,
+      stock: data.stock,
+      minimum_stock: data.min_stock,
+      minStock: data.min_stock,
+      description: data.description,
+      tax_rate: data.tax_rate,
+      gst_rate: `${data.tax_rate}%`,
+      status: data.status,
+      is_active: data.status === 'active',
+      created_at: data.created_at,
+      updated_at: data.updated_at
+    };
+  },
+
+  async delete(id: string) {
+    const { error } = await supabase
+      .from('items')
+      .delete()
+      .eq('id', id);
+
+    if (error) throw error;
+    return { success: true };
+  }
+};
+
+export interface Item {
+  id: string
+  item_name: string
+  item_code?: string
+  hsn_code?: string
+  category: string
+  unit: string
+  sale_price: number
+  purchase_price: number
+  opening_stock: number
+  current_stock: number
+  minimum_stock: number
+  godown?: string
+  gst_rate: string
+  taxable: boolean
+  barcode?: string
+  description: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+  // Legacy fields for compatibility
+  name: string
+  sku: string
+  price: number
+  cost: number
+  stock: number
+  minStock: number
+  supplier: string
+  status: "active" | "inactive"
+  totalSold: number
+  type: string
+  category_id: string
+  supplier_id: string
+  unit_id: string
+  hsn: string
+  tax_rate: number
+}
+
+interface ItemsState {
+  items: Item[]
+  stockSummary: any[]
+  loading: boolean
+  error: string | null
+  selectedItem: Item | null
+  filters: {
+    category: string
+    status: string
+    searchTerm: string
+  }
+}
+
+const initialState: ItemsState = {
+  items: [], // No dummy data, only real data from backend
+  stockSummary: [],
+  loading: false,
+  error: null,
+  selectedItem: null,
+  filters: {
+    category: "",
+    status: "",
+    searchTerm: "",
+  },
+}
+
+function mapItemFromApi(item: any): Item {
+  return {
+    // New Supabase fields
+    id: item.id,
+    item_name: item.item_name || item.name,
+    item_code: item.item_code || item.sku,
+    hsn_code: item.hsn_code || item.hsn,
+    category: item.category,
+    unit: item.unit || 'pcs',
+    sale_price: item.sale_price || item.price,
+    purchase_price: item.purchase_price || item.cost,
+    opening_stock: item.opening_stock || item.stock,
+    current_stock: item.current_stock || item.stock,
+    minimum_stock: item.minimum_stock || item.min_stock,
+    godown: item.godown,
+    gst_rate: item.gst_rate || '18%',
+    taxable: item.taxable !== false,
+    barcode: item.barcode,
+    description: item.description,
+    is_active: item.is_active !== false,
+    created_at: item.created_at,
+    updated_at: item.updated_at,
+    // Legacy fields for compatibility
+    name: item.item_name || item.name,
+    sku: item.item_code || item.sku,
+    price: item.sale_price || item.price,
+    cost: item.purchase_price || item.cost,
+    stock: item.current_stock || item.stock,
+    minStock: item.minimum_stock || item.min_stock,
+    supplier: item.supplier || '',
+    status: item.is_active !== false ? "active" : "inactive",
+    totalSold: item.total_sold || 0,
+    type: item.type || 'product',
+    category_id: item.category_id || '',
+    supplier_id: item.supplier_id || '',
+    unit_id: item.unit_id || '',
+    hsn: item.hsn_code || item.hsn || '',
+    tax_rate: item.tax_rate || 18,
+  }
+}
+
+function mapItemToApi(item: any): any {
+  return {
+    item_name: item.item_name || item.name,
+    item_code: item.item_code || item.sku,
+    hsn_code: item.hsn_code || item.hsn,
+    category: item.category,
+    unit: item.unit || 'pcs',
+    sale_price: item.sale_price || item.price,
+    purchase_price: item.purchase_price || item.cost,
+    opening_stock: item.opening_stock || item.stock,
+    current_stock: item.current_stock || item.stock,
+    minimum_stock: item.minimum_stock || item.minStock,
+    godown: item.godown,
+    gst_rate: item.gst_rate || '18%',
+    taxable: item.taxable !== false,
+    barcode: item.barcode,
+    description: item.description,
+    is_active: item.is_active !== false,
+  }
+}
+
+export const fetchItems = createAsyncThunk(
+  'items/fetchItems',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fixedItemsAPI.getAll();
+      return response.map(mapItemFromApi);
+    } catch (error) {
+      return rejectWithValue('Failed to fetch items');
+    }
+  }
+);
+
+export const createItem = createAsyncThunk(
+  'items/createItem',
+  async (item: Omit<Item, 'id' | 'created_at' | 'updated_at'>, { rejectWithValue }) => {
+    try {
+      const response = await fixedItemsAPI.create(mapItemToApi(item));
+      return mapItemFromApi(response);
+    } catch (error) {
+      return rejectWithValue('Failed to create item');
+    }
+  }
+);
+
+export const updateItemAsync = createAsyncThunk(
+  'items/updateItemAsync',
+  async ({ id, updates }: { id: string; updates: Partial<Item> }, { rejectWithValue }) => {
+    try {
+      const response = await fixedItemsAPI.update(id, mapItemToApi(updates));
+      return mapItemFromApi(response);
+    } catch (error) {
+      return rejectWithValue('Failed to update item');
+    }
+  }
+);
+
+export const deleteItem = createAsyncThunk(
+  'items/deleteItem',
+  async (id: string, { rejectWithValue }) => {
+    try {
+      await fixedItemsAPI.delete(id);
+      return id;
+    } catch (error) {
+      return rejectWithValue('Failed to delete item');
+    }
+  }
+);
+
+export const fetchStockSummary = createAsyncThunk(
+  'items/fetchStockSummary',
+  async (_, { rejectWithValue }) => {
+    try {
+      const response = await fixedItemsAPI.getAll();
+      return response.filter(item => item.current_stock <= item.minimum_stock);
+    } catch (error) {
+      return rejectWithValue('Failed to fetch stock summary');
+    }
+  }
+);
+
+const itemsSlice = createSlice({
+  name: 'items',
+  initialState,
+  reducers: {
+    addItem: (state, action: PayloadAction<Item>) => {
+      state.items.push(action.payload)
+    },
+    updateItem: (state, action: PayloadAction<{ id: string; item: Item }>) => {
+      const index = state.items.findIndex(item => item.id === action.payload.id)
+      if (index !== -1) {
+        state.items[index] = action.payload.item
+      }
+    },
+    deleteItem: (state, action: PayloadAction<string>) => {
+      state.items = state.items.filter(item => item.id !== action.payload)
+    },
+    setSelectedItem: (state, action: PayloadAction<Item | null>) => {
+      state.selectedItem = action.payload
+    },
+    updateStock: (state, action: PayloadAction<{ id: string; quantity: number; type: 'add' | 'subtract' }>) => {
+      const item = state.items.find(i => i.id === action.payload.id)
+      if (item) {
+        if (action.payload.type === 'add') {
+          item.stock += action.payload.quantity
+        } else {
+          item.stock = Math.max(0, item.stock - action.payload.quantity)
+        }
+        item.updated_at = new Date().toISOString()
+      }
+    },
+    setFilters: (state, action: PayloadAction<Partial<ItemsState['filters']>>) => {
+      state.filters = { ...state.filters, ...action.payload }
+    },
+    clearFilters: (state) => {
+      state.filters = {
+        category: "",
+        status: "",
+        searchTerm: "",
+      }
+    },
+  },
+  extraReducers: (builder) => {
+    builder
+      .addCase(fetchItems.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(fetchItems.fulfilled, (state, action) => {
+        state.loading = false
+        state.items = action.payload
+      })
+      .addCase(fetchItems.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+      .addCase(createItem.pending, (state) => {
+        state.loading = true
+        state.error = null
+      })
+      .addCase(createItem.fulfilled, (state, action) => {
+        state.loading = false
+        state.items.push(action.payload)
+      })
+      .addCase(createItem.rejected, (state, action) => {
+        state.loading = false
+        state.error = action.payload as string
+      })
+      .addCase(updateItemAsync.fulfilled, (state, action) => {
+        const index = state.items.findIndex(item => item.id === action.payload.id)
+        if (index !== -1) {
+          state.items[index] = action.payload
+        }
+      })
+      .addCase(deleteItem.fulfilled, (state, action) => {
+        state.items = state.items.filter(item => item.id !== action.payload)
+      })
+      .addCase(fetchStockSummary.fulfilled, (state, action) => {
+        state.stockSummary = action.payload
+      })
+  },
+})
+
+export const {
+  addItem,
+  updateItem,
+  deleteItem: deleteItemLocal,
+  setSelectedItem,
+  updateStock,
+  setFilters,
+  clearFilters,
+} = itemsSlice.actions
+
+// Selectors
+export const selectAllItems = (state: { items: ItemsState }) => state.items.items
+export const selectItemsLoading = (state: { items: ItemsState }) => state.items.loading
+export const selectItemsError = (state: { items: ItemsState }) => state.items.error
+export const selectSelectedItem = (state: { items: ItemsState }) => state.items.selectedItem
+export const selectFilters = (state: { items: ItemsState }) => state.items.filters
+
+export const selectFilteredItems = createSelector(
+  [
+    (state: { items: ItemsState }) => state.items.items,
+    (state: { items: ItemsState }) => state.items.filters
+  ],
+  (items, filters) => {
+    return items.filter(item => {
+      const matchesCategory = !filters.category || item.category === filters.category
+      const matchesStatus = !filters.status || item.status === filters.status
+      const matchesSearch = !filters.searchTerm || 
+        item.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        item.sku.toLowerCase().includes(filters.searchTerm.toLowerCase())
+      
+      return matchesCategory && matchesStatus && matchesSearch
+    })
+  }
+)
+
+export const selectLowStockItems = createSelector(
+  [(state: { items: ItemsState }) => state.items.items],
+  (items) => {
+    return items.filter(item => item.stock <= item.minStock)
+  }
+)
+
+export const selectItemsStats = createSelector(
+  [(state: { items: ItemsState }) => state.items.items],
+  (items) => {
+    const totalItems = items.length
+    const activeItems = items.filter(item => item.status === 'active').length
+    const lowStockItems = items.filter(item => item.stock <= item.minStock).length
+    const totalStockValue = items.reduce((sum, item) => sum + (item.stock * item.cost), 0)
+
+    return {
+      totalItems,
+      activeItems,
+      lowStockItems,
+      totalStockValue,
+    }
+  }
+)
+
+export default itemsSlice.reducer 

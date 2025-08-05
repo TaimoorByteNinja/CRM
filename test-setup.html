@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Setup Test</title>
+</head>
+<body>
+    <h1>Setup Manager Test</h1>
+    <div id="status"></div>
+    <button onclick="clearSetup()">Clear Setup</button>
+    <button onclick="checkSetup()">Check Setup</button>
+    
+    <script>
+        function checkSetup() {
+            const completed = localStorage.getItem('craft-crm-setup-completed');
+            document.getElementById('status').innerHTML = 
+                'Setup completed: ' + (completed || 'null') + 
+                '<br>Should show overlay: ' + (completed !== 'true');
+        }
+        
+        function clearSetup() {
+            localStorage.removeItem('craft-crm-setup-completed');
+            checkSetup();
+        }
+        
+        // Auto check on load
+        checkSetup();
+    </script>
+</body>
+</html>
