@@ -21,6 +21,13 @@
 /build
 /dist
 
+# electron build files
+*.exe
+*.exe.*
+*.dmg
+*.AppImage
+*.snap
+
 # misc
 .DS_Store
 *.pem
