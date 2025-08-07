@@ -5,7 +5,19 @@ import { User, Session, AuthError } from '@supabase/supabase-js'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import type { Database } from './database.types'
 
-const supabase = createClientComponentClient<Database>()
+// Check if we're running in Electron
+const isElectron = typeof window !== 'undefined' && window.electronAPI?.isElectron
+
+// Create Supabase client with proper environment variable handling
+const supabase = createClientComponentClient<Database>({
+  supabaseUrl: isElectron 
+    ? window.electronAPI?.supabaseUrl || process.env.NEXT_PUBLIC_SUPABASE_URL
+    : process.env.NEXT_PUBLIC_SUPABASE_URL,
+  supabaseKey: isElectron 
+    ? window.electronAPI?.supabaseKey || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+})
+
 import { useRouter } from 'next/navigation'
 
 interface AuthContextType {

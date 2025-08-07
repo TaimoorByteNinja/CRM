@@ -14,6 +14,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
   platform: process.platform,
   
+  // Environment variables for Supabase
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://txpufkxjnxhpnmydwdng.supabase.co',
+  supabaseKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4cHVma3hqbnhocG5teWR3ZG5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0OTI0MzksImV4cCI6MjA2ODA2ODQzOX0.kgf6HZRrKMR',
+  
   // Print operations for invoices
   print: () => window.print(),
   

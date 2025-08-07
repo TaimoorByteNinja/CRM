@@ -3,8 +3,15 @@ const path = require('path');
 const http = require('http');
 const isDev = !app.isPackaged;
 
+// Load environment variables for Electron
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
+
 // Set app name
 app.setName('Craft CRM');
+
+// Set environment variables for the renderer process
+process.env.NEXT_PUBLIC_SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://txpufkxjnxhpnmydwdng.supabase.co';
+process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4cHVma3hqbnhocG5teWR3ZG5nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTI0OTI0MzksImV4cCI6MjA2ODA2ODQzOX0.kgf6HZRrKMR';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -20,7 +27,12 @@ function createWindow() {
       enableRemoteModule: false,
       webSecurity: true, // Enable web security
       allowRunningInsecureContent: false, // Prevent insecure content
-      experimentalFeatures: false // Disable experimental features
+      experimentalFeatures: false, // Disable experimental features
+      // Pass environment variables to renderer process
+      additionalArguments: [
+        `--supabase-url=${process.env.NEXT_PUBLIC_SUPABASE_URL}`,
+        `--supabase-key=${process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY}`
+      ]
     },
     icon: path.join(__dirname, '../assets/craft-crm-icon.png'), // Updated icon path
     show: false, // Don't show until ready
