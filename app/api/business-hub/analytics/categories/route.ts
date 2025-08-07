@@ -18,52 +18,108 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Fetch user-specific sales with items data
-    const { data: sales, error: salesError } = await supabase
-      .from('user_sales')
-      .select('items, total, created_at')
-      .eq('phone_number', phoneNumber);
+    // Fetch user-specific sales with items data from both tables
+    const [businessTransactionResult, userSalesResult] = await Promise.all([
+      // Business transaction sales
+      supabase
+        .from('user_business_transactions')
+        .select('item_name, total_price, timestamp, type')
+        .eq('phone_number', phoneNumber)
+        .eq('type', 'sale'),
+      
+      // User sales (direct sales)
+      supabase
+        .from('user_sales')
+        .select('sale_data, total_amount, created_at')
+        .eq('phone_number', phoneNumber)
+    ]);
 
-    if (salesError) {
-      console.error('Error fetching sales for category analytics:', salesError);
-      return NextResponse.json({ error: salesError.message }, { status: 500 });
+    if (businessTransactionResult.error) {
+      console.error('Error fetching business transaction sales for category analytics:', businessTransactionResult.error);
+      return NextResponse.json({ error: businessTransactionResult.error.message }, { status: 500 });
     }
 
-    // Fetch user-specific items for category mapping
-    const { data: items, error: itemsError } = await supabase
-      .from('user_items')
-      .select('id, name, sku')
-      .eq('phone_number', phoneNumber);
-
-    if (itemsError) {
-      console.error('Error fetching items:', itemsError);
-      return NextResponse.json({ error: itemsError.message }, { status: 500 });
+    if (userSalesResult.error) {
+      console.error('Error fetching user sales for category analytics:', userSalesResult.error);
+      return NextResponse.json({ error: userSalesResult.error.message }, { status: 500 });
     }
 
-    // Create item mapping for quick lookup
-    const itemMap: { [key: string]: any } = {};
-    items?.forEach(item => {
-      itemMap[item.id] = item;
+    const businessTransactionSales = businessTransactionResult.data || [];
+    const userSales = userSalesResult.data || [];
+
+    console.log('📊 Categories: Found', businessTransactionSales.length, 'business transaction sales and', userSales.length, 'user sales');
+
+    // Fetch user-specific business modules for category mapping
+    const { data: modules, error: modulesError } = await supabase
+      .from('user_business_modules')
+      .select('id, name, type')
+      .eq('phone_number', phoneNumber);
+
+    if (modulesError) {
+      console.error('Error fetching modules:', modulesError);
+      return NextResponse.json({ error: modulesError.message }, { status: 500 });
+    }
+
+    // Create module mapping for category lookup
+    const moduleMap: { [key: string]: any } = {};
+    modules?.forEach(module => {
+      moduleMap[module.name] = module;
     });
 
-    // Analyze category data from sales
+    // Analyze category data from both sales sources
     const categoryStats: { [key: string]: { sales: number; revenue: number; count: number; items: Set<string> } } = {};
 
-    sales?.forEach(sale => {
-      if (sale.items && Array.isArray(sale.items)) {
-        sale.items.forEach((saleItem: any) => {
-          const item = itemMap[saleItem.itemId];
-          const category = item?.name ? 'General' : 'Unknown'; // Default category since items table doesn't have category field
+    // Process business transaction sales
+    businessTransactionSales.forEach((sale: any) => {
+      const itemName = sale.item_name || 'Unknown';
+      const module = moduleMap[itemName];
+      const category = module?.type || 'General'; // Use module type as category
+      
+      if (!categoryStats[category]) {
+        categoryStats[category] = { sales: 0, revenue: 0, count: 0, items: new Set() };
+      }
+      
+      const revenue = sale.total_price || 0;
+      categoryStats[category].sales += revenue;
+      categoryStats[category].revenue += revenue;
+      categoryStats[category].count += 1;
+      categoryStats[category].items.add(itemName);
+    });
+
+    // Process user sales (direct sales page)
+    userSales.forEach((sale: any) => {
+      const saleData = sale.sale_data || {};
+      const items = saleData.items || [];
+      const totalAmount = sale.total_amount || 0;
+      
+      if (items.length > 0) {
+        // Distribute sale amount across items
+        const amountPerItem = totalAmount / items.length;
+        
+        items.forEach((item: any) => {
+          const itemName = item.itemName || item.item_name || 'Sale Item';
+          const module = moduleMap[itemName];
+          const category = module?.type || 'General';
           
           if (!categoryStats[category]) {
             categoryStats[category] = { sales: 0, revenue: 0, count: 0, items: new Set() };
           }
           
-          categoryStats[category].sales += saleItem.total || 0;
-          categoryStats[category].revenue += (saleItem.total || 0);
-          categoryStats[category].count += saleItem.quantity || 1;
-          categoryStats[category].items.add(saleItem.itemId);
+          categoryStats[category].sales += amountPerItem;
+          categoryStats[category].revenue += amountPerItem;
+          categoryStats[category].count += 1;
+          categoryStats[category].items.add(itemName);
         });
+      } else {
+        // No items specified, add to General
+        const category = 'General';
+        if (!categoryStats[category]) {
+          categoryStats[category] = { sales: 0, revenue: 0, count: 0, items: new Set() };
+        }
+        categoryStats[category].sales += totalAmount;
+        categoryStats[category].revenue += totalAmount;
+        categoryStats[category].count += 1;
+        categoryStats[category].items.add('Direct Sale');
       }
     });
 

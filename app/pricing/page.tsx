@@ -21,8 +21,10 @@ import {
   Headphones,
   RefreshCw,
 } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import NextLink from "next/link"
+import { useTrialManagement } from "@/hooks/use-trial-management"
+import { useRouter, useSearchParams } from "next/navigation"
 
 export default function PricingPage() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
@@ -31,6 +33,53 @@ export default function PricingPage() {
   const [selectedDevice, setSelectedDevice] = useState("desktop-mobile")
   const [isDurationDropdownOpen, setIsDurationDropdownOpen] = useState(false)
   const [isDeviceDropdownOpen, setIsDeviceDropdownOpen] = useState(false)
+  const [isActivating, setIsActivating] = useState(false)
+
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const {
+    trialInfo,
+    subscriptionInfo,
+    getAccessStatus,
+    activatePremium
+  } = useTrialManagement()
+
+  // Check if user came from trial expiry
+  const fromTrial = searchParams.get('from') === 'trial'
+
+  useEffect(() => {
+    if (fromTrial && trialInfo) {
+      // Show a welcome message or highlight for trial users
+      console.log('User came from trial expiry')
+    }
+  }, [fromTrial, trialInfo])
+
+  // Handle plan activation (demo function)
+  const handlePlanActivation = async (planId: string, planName: string) => {
+    setIsActivating(true)
+    setSelectedPlan(planId)
+    
+    try {
+      // Simulate payment processing
+      await new Promise(resolve => setTimeout(resolve, 2000))
+      
+      // Activate premium subscription
+      const subscription = activatePremium(planId)
+      
+      // Show success message
+      alert(`🎉 ${planName} activated successfully!\n\nSubscription valid until: ${new Date(subscription.endDate).toLocaleDateString()}`)
+      
+      // Redirect to business hub
+      router.push('/business-hub')
+      
+    } catch (error) {
+      console.error('Failed to activate plan:', error)
+      alert('❌ Failed to activate plan. Please try again.')
+    } finally {
+      setIsActivating(false)
+      setSelectedPlan(null)
+    }
+  }
 
   // Duration and device options
   const durationOptions = [
@@ -208,6 +257,42 @@ export default function PricingPage() {
       {/* Navigation */}
       <Navigation />
 
+      {/* Trial Status Banner */}
+      {trialInfo && (
+        <div className={`w-full py-3 px-4 ${
+          subscriptionInfo?.isActive 
+            ? 'bg-gradient-to-r from-green-500 to-emerald-600' 
+            : trialInfo.isActive 
+              ? trialInfo.daysRemaining <= 1 
+                ? 'bg-gradient-to-r from-red-500 to-pink-600' 
+                : 'bg-gradient-to-r from-blue-500 to-indigo-600'
+              : 'bg-gradient-to-r from-red-500 to-pink-600'
+        } text-white`}>
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {subscriptionInfo?.isActive ? (
+                <Crown className="h-5 w-5" />
+              ) : (
+                <Clock className="h-5 w-5" />
+              )}
+              <span className="font-medium">
+                {subscriptionInfo?.isActive 
+                  ? `Premium Active - ${subscriptionInfo.daysRemaining} days remaining`
+                  : trialInfo.isActive 
+                    ? `Free Trial - ${trialInfo.daysRemaining} day${trialInfo.daysRemaining !== 1 ? 's' : ''} remaining`
+                    : 'Trial Expired - Upgrade to continue'
+                }
+              </span>
+            </div>
+            {fromTrial && (
+              <Badge variant="secondary" className="bg-white text-blue-600">
+                Upgrade Required
+              </Badge>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 py-16 lg:py-24 overflow-hidden">
         {/* Background Pattern */}
@@ -351,12 +436,25 @@ export default function PricingPage() {
                   </div>
 
                   <Button
+                    onClick={() => handlePlanActivation(plan.id, plan.name)}
+                    disabled={isActivating && selectedPlan === plan.id}
                     className={`w-full py-3 text-base font-semibold rounded-lg shadow-md transition-all duration-200 ${
                       selectedPlan === plan.id ? "bg-blue-600 hover:bg-blue-700 text-white" : plan.buttonColor
                     }`}
                   >
-                    {selectedPlan === plan.id ? "Selected" : `Select ${plan.name.split(" ")[0]} Plan`}
-                    {selectedPlan !== plan.id && <ArrowRight className="w-4 h-4 ml-2" />}
+                    {isActivating && selectedPlan === plan.id ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                        Activating...
+                      </>
+                    ) : selectedPlan === plan.id ? (
+                      "Selected" 
+                    ) : (
+                      <>
+                        Activate {plan.name.split(" ")[0]} Plan
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </>
+                    )}
                   </Button>
 
                   <div className="mt-6">

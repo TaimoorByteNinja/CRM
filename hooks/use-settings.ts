@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useAppSelector, useAppDispatch } from '@/lib/store/hooks'
+import { pinService } from '@/lib/pin-service'
 import {
   selectGeneralSettings,
   selectTransactionSettings,
@@ -71,6 +72,12 @@ export interface UseSettingsReturn {
   // Utility functions
   isFeatureEnabled: (section: keyof UseSettingsReturn, feature: string) => boolean
   toggleFeature: (section: string, feature: string) => void
+  
+  // PIN utility functions
+  isPINRequired: () => boolean
+  isPINSetup: () => Promise<boolean>
+  isPINVerified: () => boolean
+  clearPINData: () => Promise<void>
 }
 
 export const useSettings = (): UseSettingsReturn => {
@@ -244,6 +251,42 @@ export const useSettings = (): UseSettingsReturn => {
     message,
     tax
   ])
+
+  // PIN utility functions
+  const isPINRequired = useCallback((): boolean => {
+    return general.enablePasscode && general.passcodeSetup
+  }, [general.enablePasscode, general.passcodeSetup])
+
+  const isPINSetup = useCallback(async (): Promise<boolean> => {
+    if (!general.phoneNumber) return false
+    return await pinService.hasPIN(general.phoneNumber)
+  }, [general.phoneNumber])
+
+  const isPINVerified = useCallback((): boolean => {
+    if (!isPINRequired()) return true
+    
+    const sessionPinVerified = sessionStorage.getItem('pinVerified') === 'true'
+    const pinVerificationTime = sessionStorage.getItem('pinVerificationTime')
+    
+    if (!sessionPinVerified || !pinVerificationTime) return false
+    
+    // Check if verification is still valid (24 hour session)
+    const verificationTime = new Date(pinVerificationTime)
+    const now = new Date()
+    const hoursDiff = (now.getTime() - verificationTime.getTime()) / (1000 * 60 * 60)
+    
+    return hoursDiff < 24
+  }, [isPINRequired])
+
+  const clearPINData = useCallback(async (): Promise<void> => {
+    if (general.phoneNumber) {
+      await pinService.deletePIN(general.phoneNumber)
+    }
+    
+    // Update settings
+    updateGeneralWithSave('enablePasscode', false)
+    updateGeneralWithSave('passcodeSetup', false)
+  }, [general.phoneNumber, updateGeneralWithSave])
   
   return {
     // Settings data
@@ -285,7 +328,13 @@ export const useSettings = (): UseSettingsReturn => {
     
     // Utility functions
     isFeatureEnabled,
-    toggleFeature
+    toggleFeature,
+    
+    // PIN utility functions
+    isPINRequired,
+    isPINSetup,
+    isPINVerified,
+    clearPINData
   }
 }
 

@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
     sale_data: saleData // Store complete sale object for flexibility
   };
   
+  // Insert into user_sales table (for sales page)
   const { data, error } = await supabase
     .from('user_sales')
     .insert([mappedSaleData])
@@ -120,6 +121,34 @@ export async function POST(req: NextRequest) {
   if (error) {
     console.error('Supabase insert error:', error);
     return NextResponse.json({ error: error.message }, { status: 400 });
+  }
+  
+  // Also insert into user_business_transactions table (for overview page analytics)
+  const items = saleData.items || [];
+  const firstItem = items[0] || {};
+  
+  const businessTransactionData = {
+    phone_number: phone,
+    type: 'sale',
+    total_price: saleData.total_amount || saleData.total || saleData.amount || 0,
+    payment_status: saleData.payment_status || saleData.paymentStatus || 'unpaid',
+    customer_supplier_name: saleData.party_name || saleData.partyName || 'Customer',
+    item_name: firstItem.itemName || firstItem.item_name || 'Sale Item',
+    quantity: firstItem.quantity || 1,
+    timestamp: new Date().toISOString()
+  };
+  
+  console.log('💼 Also inserting into user_business_transactions:', businessTransactionData);
+  
+  const { error: businessTransactionError } = await supabase
+    .from('user_business_transactions')
+    .insert([businessTransactionData]);
+  
+  if (businessTransactionError) {
+    console.error('⚠️ Failed to insert into user_business_transactions:', businessTransactionError);
+    // Don't fail the entire operation, just log the error
+  } else {
+    console.log('✅ Successfully inserted into user_business_transactions');
   }
   
   console.log('Supabase insert success:', data);

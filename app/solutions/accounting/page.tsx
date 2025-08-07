@@ -5,18 +5,43 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Calculator, TrendingUp, FileText, PieChart, Download, CheckCircle, Users, Shield, Clock } from "lucide-react"
 import { Navigation } from "@/components/navigation"
+import { TrialManager } from "@/lib/trial-manager"
 
 export default function AccountingPage() {
   const [isDownloading, setIsDownloading] = useState(false)
 
   const handleDownload = async () => {
     setIsDownloading(true)
-    const link = document.createElement("a")
-    link.href = "/business-hub-installer.exe"
-    link.download = "business-hub-installer.exe"
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
+    
+    try {
+      // Initialize trial when user downloads the app
+      const trialInfo = TrialManager.initializeTrial()
+      console.log('Trial initialized:', trialInfo)
+      
+      // Download the installer
+      const link = document.createElement("a")
+      link.href = "/business-hub-installer.exe"
+      link.download = "craft-crm-installer.exe"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      
+      // Show success message
+      setTimeout(() => {
+        alert(`🎉 Download started! Your 7-day free trial begins now.\n\n• Trial expires: ${new Date(trialInfo.endDate).toLocaleDateString()}\n• Days remaining: ${trialInfo.daysRemaining}`)
+      }, 500)
+      
+    } catch (error) {
+      console.error('Error during download:', error)
+      // Still allow download even if trial initialization fails
+      const link = document.createElement("a")
+      link.href = "/business-hub-installer.exe"
+      link.download = "craft-crm-installer.exe"
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    }
+    
     setTimeout(() => setIsDownloading(false), 1000)
   }
 

@@ -484,22 +484,22 @@ export default function BankPage() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <Button className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                {/* <Button className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Sale
                 </Button>
                 <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Purchase
-                </Button>
-                <Button
+                </Button> */}
+                {/* <Button
                   variant="outline"
                   size="sm"
                   className="rounded-xl border-gray-200 hover:bg-gray-50 transition-all duration-200 bg-transparent"
                 >
                   <Plus className="h-4 w-4" />
-                </Button>
-                <DropdownMenu>
+                </Button> */}
+                {/* <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
                       variant="outline"
@@ -519,7 +519,7 @@ export default function BankPage() {
                       Import Data
                     </DropdownMenuItem>
                   </DropdownMenuContent>
-                </DropdownMenu>
+                </DropdownMenu> */}
               </div>
             </div>
           </div>
@@ -656,8 +656,8 @@ export default function BankPage() {
                     <div className="w-16 h-16 bg-gradient-to-r from-blue-100 to-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
                       <Building2 className="h-8 w-8 text-blue-600" />
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Banking with Vyapar</h3>
-                    <p className="text-gray-600 mb-6">Add Bank accounts on Vyapar and you can effortlessly:</p>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Banking with Craft CRM</h3>
+                    <p className="text-gray-600 mb-6">Add Bank accounts on Craft CRM and you can effortlessly:</p>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                       <div className="text-center">
@@ -675,7 +675,7 @@ export default function BankPage() {
                         </div>
                         <h4 className="font-medium text-gray-900 mb-2">Track your transactions</h4>
                         <p className="text-sm text-gray-600">
-                          Keep track of bank transactions by entering them on Vyapar to maintain accurate records.
+                          Keep track of bank transactions by entering them on Craft CRM to maintain accurate records.
                         </p>
                       </div>
                       <div className="text-center">
@@ -699,7 +699,7 @@ export default function BankPage() {
 
                     <div className="mt-8 flex items-center justify-center gap-2 text-sm text-gray-500">
                       <Shield className="h-4 w-4 text-green-500" />
-                      <span>At Vyapar, the security of your details is our top priority.</span>
+                      <span>At Craft CRM, the security of your details is our top priority.</span>
                     </div>
                   </CardContent>
                 </Card>

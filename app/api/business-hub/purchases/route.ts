@@ -162,6 +162,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: insertError.message }, { status: 400 });
     }
 
+    // Also insert into user_business_transactions table (for overview page analytics)
+    const purchaseItems = purchaseData.items || [];
+    const firstItem = purchaseItems[0] || {};
+    
+    const businessTransactionData = {
+      phone_number: phone,
+      type: 'purchase',
+      total_price: purchase.total_amount || 0,
+      payment_status: purchaseData.payment_status || 'pending',
+      customer_supplier_name: purchase.supplier_name || 'Supplier',
+      item_name: firstItem.itemName || firstItem.item_name || 'Purchase Item',
+      quantity: firstItem.quantity || 1,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('💼 Also inserting purchase into user_business_transactions:', businessTransactionData);
+    
+    const { error: businessTransactionError } = await supabase
+      .from('user_business_transactions')
+      .insert([businessTransactionData]);
+    
+    if (businessTransactionError) {
+      console.error('⚠️ Failed to insert purchase into user_business_transactions:', businessTransactionError);
+      // Don't fail the entire operation, just log the error
+    } else {
+      console.log('✅ Successfully inserted purchase into user_business_transactions');
+    }
+
     // Update party balance if supplier is specified and purchase is not draft
     if (purchase.supplier_id && purchase.status !== 'draft' && purchase.total_amount > 0) {
       const balanceUpdated = await updatePartyBalance(

@@ -17,9 +17,47 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar"
 import { useCurrency } from "@/lib/currency-manager"
-import { useAppSelector } from "@/lib/store/hooks"
+import { useAppSelector, useAppDispatch } from "@/lib/store/hooks"
 import { selectGeneralSettings } from "@/lib/store/slices/settingsSlice"
+import { 
+  selectBusinessModules,
+  selectBusinessTransactions,
+  selectBusinessCart,
+  selectCalculatorHistory,
+  selectBusinessManagerLoading,
+  selectBusinessMetrics,
+  selectCartTotal,
+  selectLowStockModules,
+  selectLastSaved,
+  selectIsAutoSaving,
+  selectDailyReset,
+  fetchBusinessModules,
+  saveBusinessModule,
+  updateBusinessModule,
+  deleteBusinessModule,
+  fetchTransactions,
+  saveTransaction,
+  addModule,
+  updateModule,
+  removeModule,
+  addTransaction,
+  updateModuleStock,
+  addToCart,
+  removeFromCart,
+  updateCartItemQuantity,
+  clearCart,
+  setCustomQuantity,
+  addCalculatorHistory,
+  setDailyReset,
+  resetTodaysSales,
+  clearAllData,
+  setLoading,
+  setError,
+  setIsAutoSaving,
+  setLastSaved
+} from "@/lib/store/slices/businessManagerSlice"
 import { getCountryByCode } from "@/lib/country-data"
+import { showNotification } from "@/lib/store/slices/uiSlice"
 import {
   Calculator,
   Plus,
@@ -201,32 +239,27 @@ const moduleColors = [
 ]
 
 export default function BusinessManager() {
+  const dispatch = useAppDispatch()
   const generalSettings = useAppSelector(selectGeneralSettings)
+  const modules = useAppSelector(selectBusinessModules)
+  const transactions = useAppSelector(selectBusinessTransactions)
+  const cart = useAppSelector(selectBusinessCart)
+  const calculatorHistory = useAppSelector(selectCalculatorHistory)
+  const loading = useAppSelector(selectBusinessManagerLoading)
+  const businessMetrics = useAppSelector(selectBusinessMetrics)
+  const cartTotal = useAppSelector(selectCartTotal)
+  const lowStockModules = useAppSelector(selectLowStockModules)
+  const lastSaved = useAppSelector(selectLastSaved)
+  const isAutoSaving = useAppSelector(selectIsAutoSaving)
+  const dailyReset = useAppSelector(selectDailyReset)
   const { formatAmountWithSymbol, getSymbol, getCode, getName } = useCurrency()
   
-  // Get current currency from Redux settings
-  const getCurrentCurrency = (): Currency => {
-    const country = getCountryByCode(generalSettings.selectedCountry)
-    if (country) {
-      return {
-        code: country.currency.code,
-        symbol: country.currency.symbol,
-        name: country.currency.name,
-        rate: 1 // We'll use 1 as base rate since we're not doing conversions
-      }
-    }
-    // Fallback to USD if no country is selected
-    return currencies.find(c => c.code === 'USD') || currencies[0]
-  }
-  
+  // Local UI state (not business data)
   const [activeTab, setActiveTab] = useState("home")
-  const [modules, setModules] = useState<BusinessModule[]>([])
   const [selectedModule, setSelectedModule] = useState<string | null>(null)
   const [expandedModule, setExpandedModule] = useState<string | null>(null)
   const [calculatorDisplay, setCalculatorDisplay] = useState("0")
-  const [calculatorHistory, setCalculatorHistory] = useState<CalculatorHistory[]>([])
   const [currentExpression, setCurrentExpression] = useState("")
-  const [transactions, setTransactions] = useState<Transaction[]>([])
   const [showCalculator, setShowCalculator] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [showAddModuleDialog, setShowAddModuleDialog] = useState(false)
@@ -236,190 +269,238 @@ export default function BusinessManager() {
   const [moduleToDelete, setModuleToDelete] = useState<string | null>(null)
   const [lowStockModule, setLowStockModule] = useState<BusinessModule | null>(null)
   const [newModule, setNewModule] = useState<Partial<BusinessModule>>({})
-  const [cart, setCart] = useState<CartItem[]>([])
-  const [cartTotal, setCartTotal] = useState(0)
   const [showClearCartDialog, setShowClearCartDialog] = useState(false)
   const [showDeleteItemDialog, setShowDeleteItemDialog] = useState(false)
   const [itemToDelete, setItemToDelete] = useState<string | null>(null)
   const [customQuantities, setCustomQuantities] = useState<Record<string, number>>({})
-  const [lastSaved, setLastSaved] = useState<Date | null>(null)
-  const [isAutoSaving, setIsAutoSaving] = useState(false)
-  const [dailyReset, setDailyReset] = useState<DailyReset>({
-    lastResetDate: new Date().toDateString(),
-    todaysSalesReset: false,
-  })
   const [showResetDialog, setShowResetDialog] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
-  
-  // Get current currency based on selected country from Redux
-  const selectedCurrency = getCurrentCurrency()
 
-  // Check for daily reset at midnight
-  const checkDailyReset = useCallback(() => {
-    const currentDate = new Date().toDateString()
-    const savedReset = localStorage.getItem("daily-reset-data")
-    let resetData: DailyReset = {
-      lastResetDate: currentDate,
-      todaysSalesReset: false,
-    }
+  // Phone number from settings - used for data isolation
+  const phoneNumber = generalSettings.phoneNumber
 
-    if (savedReset) {
-      try {
-        resetData = JSON.parse(savedReset)
-      } catch (error) {
-        console.error("Failed to parse daily reset data:", error)
+  // Currency is now managed through Redux settings
+  const selectedCurrency = (() => {
+    const country = getCountryByCode(generalSettings.selectedCountry)
+    if (country) {
+      return {
+        code: country.currency.code,
+        symbol: country.currency.symbol,
+        name: country.currency.name,
+        rate: 1
       }
     }
+    return { code: 'USD', symbol: '$', name: 'US Dollar', rate: 1 }
+  })()
 
-    // If it's a new day, reset today's sales
-    if (resetData.lastResetDate !== currentDate) {
-      resetData = {
-        lastResetDate: currentDate,
-        todaysSalesReset: true,
-      }
-
-      // Reset today's sales transactions
-      setTransactions((prev) => {
-        const yesterday = new Date()
-        yesterday.setDate(yesterday.getDate() - 1)
-        const yesterdayString = yesterday.toDateString()
-
-        // Filter out yesterday's sales transactions
-        const filteredTransactions = prev.filter((t) => {
-          const transactionDate = new Date(t.timestamp).toDateString()
-          return !(t.type === "sale" && transactionDate === yesterdayString)
-        })
-
-        return filteredTransactions
-      })
-
-      localStorage.setItem("daily-reset-data", JSON.stringify(resetData))
-      setDailyReset(resetData)
+  // Format currency using the selected currency
+  const formatCurrency = (amount: number | null | undefined) => {
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      return `${selectedCurrency.symbol}0.00`
     }
-  }, [])
-
-  // Auto-save functionality with better persistence
-  useEffect(() => {
-    const saveData = () => {
-      setIsAutoSaving(true)
-      try {
-        localStorage.setItem(
-          "business-manager-data",
-          JSON.stringify({
-            modules,
-            transactions,
-            calculatorHistory,
-            selectedCurrency,
-            cart,
-            customQuantities,
-            lastSaved: new Date().toISOString(),
-          }),
-        )
-        setLastSaved(new Date())
-      } catch (error) {
-        console.error("Failed to save data:", error)
-      } finally {
-        setIsAutoSaving(false)
-      }
-    }
-
-    // Save immediately when data changes
-    if (modules.length > 0 || transactions.length > 0) {
-      const timeoutId = setTimeout(saveData, 1000) // Debounce saves
-      return () => clearTimeout(timeoutId)
-    }
-  }, [modules, transactions, calculatorHistory, selectedCurrency, cart, customQuantities])
-
-  // Load saved data with better error handling
-  useEffect(() => {
-    const loadData = () => {
-      try {
-        const savedData = localStorage.getItem("business-manager-data")
-        if (savedData) {
-          const parsed = JSON.parse(savedData)
-          if (parsed.modules && Array.isArray(parsed.modules)) {
-            setModules(parsed.modules)
-          }
-          if (parsed.transactions && Array.isArray(parsed.transactions)) {
-            setTransactions(
-              parsed.transactions.map((t: Transaction) => ({
-                ...t,
-                timestamp: new Date(t.timestamp),
-              })),
-            )
-          }
-          if (parsed.calculatorHistory && Array.isArray(parsed.calculatorHistory)) {
-            setCalculatorHistory(parsed.calculatorHistory)
-          }
-          // Note: selectedCurrency is now determined by Redux settings, not local storage
-          if (parsed.cart && Array.isArray(parsed.cart)) {
-            setCart(parsed.cart)
-          }
-          if (parsed.customQuantities) {
-            setCustomQuantities(parsed.customQuantities)
-          }
-          if (parsed.lastSaved) {
-            setLastSaved(new Date(parsed.lastSaved))
-          }
-        }
-      } catch (error) {
-        console.error("Failed to load saved data:", error)
-      }
-    }
-
-    // Check for daily reset first
-    checkDailyReset()
-    loadData()
-
-    // Set up interval to check for daily reset every minute
-    const interval = setInterval(() => {
-      checkDailyReset()
-    }, 60000)
-
-    return () => clearInterval(interval)
-  }, [checkDailyReset])
-
-  // Update cart total when cart changes
-  useEffect(() => {
-    const total = cart.reduce((sum, item) => sum + item.totalPrice, 0)
-    setCartTotal(total)
-  }, [cart])
-
-  // Currency conversion functions
-  const convertPrice = (priceInUSD: number, toCurrency: Currency): number => {
-    return priceInUSD * toCurrency.rate
+    return `${selectedCurrency.symbol}${amount.toFixed(2)}`
   }
 
-  const convertToUSD = (price: number, fromCurrency: Currency): number => {
-    return price / fromCurrency.rate
+  // Load data when component mounts and phone number is available
+  useEffect(() => {
+    console.log('🔄 BusinessManager useEffect triggered:', { 
+      phoneNumber, 
+      phoneExists: phoneNumber && phoneNumber.trim() !== '',
+      generalSettings: generalSettings,
+      currentModules: modules.length,
+      currentTransactions: transactions.length
+    })
+    
+    if (phoneNumber && phoneNumber.trim() !== '') {
+      console.log('📱 Phone number available, fetching business data...', phoneNumber)
+      dispatch(fetchBusinessModules(phoneNumber))
+      dispatch(fetchTransactions(phoneNumber))
+    } else {
+      console.log('⚠️ No phone number available for data fetching:', { phoneNumber, generalSettings })
+    }
+  }, [dispatch, phoneNumber, modules.length, transactions.length])
+
+  // Show notification when phone number is missing
+  useEffect(() => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      dispatch(showNotification({
+        type: 'warning',
+        message: 'Please set up your phone number in settings to use Business Manager features'
+      }))
+    }
+  }, [dispatch, phoneNumber])
+
+  // Module management functions now use Redux actions
+  const handleAddModule = async () => {
+    console.log('🔧 HandleAddModule called with:', { phoneNumber, newModule })
+    
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      console.log('❌ Phone number validation failed:', phoneNumber)
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Phone number is required to save business data'
+      }))
+      return
+    }
+
+    if (!newModule.name || !newModule.totalStock || !newModule.pricePerUnit) {
+      console.log('❌ Form validation failed:', { name: newModule.name, totalStock: newModule.totalStock, pricePerUnit: newModule.pricePerUnit })
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Please fill in all required fields (Name, Stock, Price)'
+      }))
+      return
+    }
+
+    const moduleData = {
+      id: `module_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: newModule.name,
+      type: 'inventory' as const,
+      items: [],
+      settings: {},
+      position: { x: 0, y: 0 },
+      size: { width: 200, height: 150 },
+      color: '#3B82F6',
+      icon: 'package',
+      totalStock: newModule.totalStock || 0,
+      pricePerUnit: newModule.pricePerUnit || 0,
+      phone_number: phoneNumber,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
+
+    console.log('📦 Module data prepared:', moduleData)
+
+    try {
+      console.log('🚀 Dispatching saveBusinessModule...')
+      await dispatch(saveBusinessModule({ phoneNumber, module: moduleData })).unwrap()
+      console.log('✅ Module saved successfully')
+      dispatch(showNotification({
+        type: 'success',
+        message: 'Module added successfully!'
+      }))
+      setNewModule({})
+      setShowAddModuleDialog(false)
+    } catch (error) {
+      console.error('❌ Error adding module:', error)
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Failed to add module. Please try again.'
+      }))
+    }
   }
 
-  const formatCurrency = (amount: number, currency: Currency = selectedCurrency): string => {
-    // Use the standard currency formatter instead of custom formatting
-    return formatAmountWithSymbol(amount)
+  const handleUpdateModule = async (moduleId: string, updates: Partial<BusinessModule>) => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Phone number is required to update business data',
+        duration: 5000
+      }))
+      return
+    }
+
+    try {
+      await dispatch(updateBusinessModule({ phoneNumber, moduleId, updates })).unwrap()
+      dispatch(showNotification({
+        type: 'success',
+        message: 'Module updated successfully!',
+        duration: 3000
+      }))
+    } catch (error) {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Failed to update module',
+        duration: 5000
+      }))
+    }
   }
 
-  // Currency conversion functionality disabled - currency is now managed through Redux settings
-  // const handleCurrencyChange = (newCurrency: Currency) => {
-  //   // Convert all existing module prices to the new currency
-  //   const updatedModules = modules.map((module) => ({
-  //     ...module,
-  //     pricePerUnit: convertPrice(convertToUSD(module.pricePerUnit, selectedCurrency), newCurrency),
-  //   }))
+  const handleDeleteModule = async () => {
+    if (!phoneNumber || phoneNumber.trim() === '' || !moduleToDelete) {
+      return
+    }
 
-  //   // Convert cart items
-  //   const updatedCart = cart.map((item) => {
-  //     const newPricePerUnit = convertPrice(convertToUSD(item.pricePerUnit, selectedCurrency), newCurrency)
-  //     return {
-  //       ...item,
-  //       pricePerUnit: newPricePerUnit,
-  //       totalPrice: item.quantity * newPricePerUnit,
-  //     }
-  //   })
+    try {
+      await dispatch(deleteBusinessModule({ phoneNumber, moduleId: moduleToDelete })).unwrap()
+      dispatch(showNotification({
+        type: 'success',
+        message: 'Module deleted successfully!',
+        duration: 3000
+      }))
+      setModuleToDelete(null)
+      setShowDeleteDialog(false)
+    } catch (error) {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Failed to delete module',
+        duration: 5000
+      }))
+    }
+  }
 
-  //   setModules(updatedModules)
-  //   setCart(updatedCart)
-  // }
+  // Manual save function for UI button
+  const manualSave = async () => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      dispatch(showNotification({
+        type: 'warning',
+        message: 'Please set up your phone number in settings to save business data'
+      }))
+      return
+    }
+
+    try {
+      dispatch(setIsAutoSaving(true))
+      
+      // In Redux implementation, data is automatically saved through API calls
+      // This is more of a sync operation to ensure everything is up to date
+      await dispatch(fetchBusinessModules(phoneNumber))
+      await dispatch(fetchTransactions(phoneNumber))
+      
+      dispatch(setLastSaved(new Date().toISOString()))
+      dispatch(showNotification({
+        type: 'success',
+        message: 'Data synchronized successfully!'
+      }))
+    } catch (error) {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Failed to synchronize data'
+      }))
+    } finally {
+      dispatch(setIsAutoSaving(false))
+    }
+  }
+
+  // Export data function
+  const exportData = () => {
+    const dataToExport = {
+      modules,
+      transactions,
+      calculatorHistory,
+      exportDate: new Date().toISOString(),
+      phoneNumber: phoneNumber,
+      currency: selectedCurrency
+    }
+
+    const blob = new Blob([JSON.stringify(dataToExport, null, 2)], {
+      type: 'application/json'
+    })
+    
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `business-manager-export-${new Date().toISOString().split('T')[0]}.json`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+
+    dispatch(showNotification({
+      type: 'success',
+      message: 'Business data exported successfully!'
+    }))
+  }
 
   // Enhanced Calculator Functions
   const handleCalculatorInput = (value: string) => {
@@ -432,18 +513,19 @@ export default function BusinessManager() {
         // Replace business variables if any
         expression = expression.replace(/\$(\w+)/g, (match, itemName) => {
           const module = modules.find((m) => m.name.toLowerCase().replace(/\s+/g, "") === itemName.toLowerCase())
-          return module ? module.pricePerUnit.toString() : match
+          return module ? module.salePrice.toString() : match
         })
 
         const result = eval(expression)
-        const historyEntry: CalculatorHistory = {
+        const historyEntry = {
           id: Date.now().toString(),
           expression: currentExpression || calculatorDisplay,
           result: result,
           timestamp: new Date(),
         }
 
-        setCalculatorHistory((prev) => [historyEntry, ...prev.slice(0, 19)])
+        // Add to calculator history in Redux
+        dispatch(addCalculatorEntry(historyEntry))
         setCalculatorDisplay(result.toString())
         setCurrentExpression("")
       } catch (error) {
@@ -466,136 +548,113 @@ export default function BusinessManager() {
     }
   }
 
-  // Module Management Functions
-  const addBusinessModule = (moduleData: Partial<BusinessModule>) => {
-    const colorIndex = modules.length % moduleColors.length
-    const newModule: BusinessModule = {
-      id: Date.now().toString(),
-      name: moduleData.name || "",
-      type: "inventory",
-      items: [],
-      settings: {},
-      position: { x: 0, y: 0 },
-      size: { width: 300, height: 200 },
-      color: moduleColors[colorIndex],
-      icon: "Package",
-      totalStock: moduleData.totalStock || 0,
-      pricePerUnit: moduleData.pricePerUnit || 0,
+  const updateModuleStock = async (moduleId: string, newStock: number) => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Phone number is required to update stock'
+      }))
+      return
     }
 
-    setModules((prev) => [...prev, newModule])
+    const module = modules.find(m => m.id === moduleId)
+    if (!module) return
 
-    // Create initial transaction record
-    const transaction: Transaction = {
-      id: Date.now().toString(),
-      itemId: newModule.id,
-      itemName: newModule.name,
-      quantity: newModule.totalStock,
-      unitPrice: newModule.pricePerUnit,
-      totalPrice: newModule.totalStock * newModule.pricePerUnit,
-      type: "purchase",
-      timestamp: new Date(),
-      notes: `Initial stock entry for ${newModule.name}`,
-    }
-
-    setTransactions((prev) => [transaction, ...prev])
-  }
-
-  const deleteModule = (moduleId: string) => {
-    setModules((prev) => prev.filter((m) => m.id !== moduleId))
-    setCart((prev) => prev.filter((item) => item.moduleId !== moduleId))
-    setExpandedModule(null)
-    setShowDeleteDialog(false)
-    setModuleToDelete(null)
-  }
-
-  const updateModuleStock = (moduleId: string, newStock: number) => {
-    setModules((prev) =>
-      prev.map((module) =>
-        module.id === moduleId ? { ...module, totalStock: Math.max(0, newStock), lastUpdated: new Date() } : module,
-      ),
-    )
-  }
-
-  const addToCart = (module: BusinessModule, quantity: number) => {
-    const existingItem = cart.find((item) => item.moduleId === module.id)
-    if (existingItem) {
-      setCart((prev) =>
-        prev.map((item) =>
-          item.moduleId === module.id
-            ? {
-                ...item,
-                quantity: item.quantity + quantity,
-                totalPrice: (item.quantity + quantity) * item.pricePerUnit,
-              }
-            : item,
-        ),
-      )
-    } else {
-      const newCartItem: CartItem = {
-        moduleId: module.id,
-        moduleName: module.name,
-        quantity: quantity,
-        pricePerUnit: module.pricePerUnit,
-        totalPrice: quantity * module.pricePerUnit,
-        color: module.color,
-      }
-      setCart((prev) => [...prev, newCartItem])
+    try {
+      await dispatch(updateBusinessModule({ 
+        phoneNumber, 
+        module: { ...module, totalStock: Math.max(0, newStock) }
+      })).unwrap()
+    } catch (error) {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Failed to update stock'
+      }))
     }
   }
 
-  const removeFromCart = (moduleId: string, quantity: number) => {
-    setCart((prev) =>
-      prev
-        .map((item) =>
-          item.moduleId === moduleId
-            ? {
-                ...item,
-                quantity: Math.max(0, item.quantity - quantity),
-                totalPrice: Math.max(0, item.quantity - quantity) * item.pricePerUnit,
-              }
-            : item,
-        )
-        .filter((item) => item.quantity > 0),
-    )
+  // Cart management functions now use Redux actions
+  const addToCartHandler = (module: BusinessModule, quantity: number) => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Phone number is required for cart operations',
+        duration: 5000
+      }))
+      return
+    }
+    
+    const cartItem = {
+      moduleId: module.id,
+      moduleName: module.name,
+      quantity: quantity,
+      pricePerUnit: module.pricePerUnit,
+      totalPrice: quantity * module.pricePerUnit,
+      color: module.color || '#8B5CF6'
+    }
+    
+    dispatch(addToCart(cartItem))
   }
 
-  const confirmSale = () => {
-    let allSalesSuccessful = true
-    const saleTransactions: Transaction[] = []
+  const removeFromCartHandler = (moduleId: string, quantity: number) => {
+    dispatch(removeFromCart({ moduleId, quantity }))
+  }
 
-    cart.forEach((cartItem) => {
-      const module = modules.find((m) => m.id === cartItem.moduleId)
-      if (module && module.totalStock >= cartItem.quantity) {
-        // Update stock
-        updateModuleStock(module.id, module.totalStock - cartItem.quantity)
+  const confirmSale = async () => {
+    if (!phoneNumber || phoneNumber.trim() === '') {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Phone number is required for sales'
+      }))
+      return
+    }
 
-        // Create transaction
-        const transaction: Transaction = {
-          id: Date.now().toString(),
+    try {
+      // Process each cart item
+      for (const cartItem of cart) {
+        const module = modules.find(m => m.id === cartItem.moduleId)
+        if (!module) {
+          throw new Error(`Module ${cartItem.moduleId} not found`)
+        }
+        
+        const transaction = {
+          id: Date.now().toString() + Math.random().toString(36).substring(2),
           itemId: module.id,
           itemName: module.name,
           quantity: cartItem.quantity,
           unitPrice: cartItem.pricePerUnit,
           totalPrice: cartItem.totalPrice,
-          type: "sale",
+          type: "sale" as const,
           timestamp: new Date(),
           notes: `Sale of ${cartItem.quantity} units`,
+          phone_number: phoneNumber
         }
-        saleTransactions.push(transaction)
-      } else {
-        allSalesSuccessful = false
-      }
-    })
 
-    if (allSalesSuccessful) {
-      setTransactions((prev) => [...saleTransactions, ...prev])
-      generateReceipt()
-      setCart([])
+        // Save transaction
+        await dispatch(saveTransaction({ phoneNumber, transaction })).unwrap()
+        
+        // Update module stock
+        await dispatch(updateBusinessModule({ 
+          phoneNumber, 
+          module: { ...module, totalStock: module.totalStock - cartItem.quantity }
+        })).unwrap()
+      }
+
+      // Clear cart and close dialogs
+      dispatch(clearCart())
       setExpandedModule(null)
       setShowConfirmDialog(false)
-    } else {
-      alert("Insufficient stock for some items!")
+      
+      dispatch(showNotification({
+        type: 'success',
+        message: `Sale completed! Total: ${formatCurrency(cartTotal)}`
+      }))
+
+    } catch (error) {
+      dispatch(showNotification({
+        type: 'error',
+        message: 'Failed to complete sale'
+      }))
     }
   }
 
@@ -668,33 +727,31 @@ Thank you for your business!
   }
 
   const getTotalInventoryValue = () => {
-    return modules.reduce((total, module) => total + module.totalStock * module.pricePerUnit, 0)
+    return modules.reduce((total, module) => {
+      const stock = module.totalStock || 0
+      const price = module.pricePerUnit || 0
+      return total + (stock * price)
+    }, 0)
   }
 
   const getTodaysSales = () => {
     const today = new Date().toDateString()
     return transactions
       .filter((t) => t.type === "sale" && new Date(t.timestamp).toDateString() === today)
-      .reduce((sum, t) => sum + t.totalPrice, 0)
+      .reduce((sum, t) => sum + (t.totalPrice || 0), 0)
   }
 
   const getLowStockCount = () => {
     return modules.filter((module) => checkLowStock(module)).length
   }
 
-  const clearCart = () => {
-    setCart([])
-    setCustomQuantities({})
+  const clearCartData = () => {
+    dispatch(clearCart())
     setShowClearCartDialog(false)
   }
 
   const deleteCartItem = (moduleId: string) => {
-    setCart((prev) => prev.filter((item) => item.moduleId !== moduleId))
-    setCustomQuantities((prev) => {
-      const updated = { ...prev }
-      delete updated[moduleId]
-      return updated
-    })
+    dispatch(removeFromCart({ moduleId }))
     setShowDeleteItemDialog(false)
     setItemToDelete(null)
   }
@@ -713,81 +770,19 @@ Thank you for your business!
       return
     }
 
-    setCart((prev) =>
-      prev.map((item) =>
-        item.moduleId === moduleId
-          ? {
-              ...item,
-              quantity: newQuantity,
-              totalPrice: newQuantity * item.pricePerUnit,
-            }
-          : item,
-      ),
-    )
-
-    setCustomQuantities((prev) => ({ ...prev, [moduleId]: newQuantity }))
+    dispatch(updateCartItemQuantity({ moduleId, quantity: newQuantity }))
+    dispatch(setCustomQuantity({ moduleId, quantity: newQuantity }))
   }
 
   const handleCustomQuantityChange = (moduleId: string, value: string) => {
     const numValue = Number.parseInt(value) || 0
-    setCustomQuantities((prev) => ({ ...prev, [moduleId]: numValue }))
+    dispatch(setCustomQuantity({ moduleId, quantity: numValue }))
   }
 
   const applyCustomQuantity = (moduleId: string) => {
     const customQty = customQuantities[moduleId]
     if (customQty !== undefined) {
       updateCartItemQuantity(moduleId, customQty)
-    }
-  }
-
-  const manualSave = () => {
-    setIsAutoSaving(true)
-    try {
-      localStorage.setItem(
-        "business-manager-data",
-        JSON.stringify({
-          modules,
-          transactions,
-          calculatorHistory,
-          selectedCurrency,
-          cart,
-          customQuantities,
-          lastSaved: new Date().toISOString(),
-        }),
-      )
-      setLastSaved(new Date())
-      alert("Data saved successfully!")
-    } catch (error) {
-      console.error("Failed to save data:", error)
-      alert("Failed to save data. Please try again.")
-    } finally {
-      setIsAutoSaving(false)
-    }
-  }
-
-  const exportData = () => {
-    try {
-      const dataToExport = {
-        modules,
-        transactions,
-        calculatorHistory,
-        selectedCurrency,
-        exportDate: new Date().toISOString(),
-        version: "1.0",
-      }
-
-      const blob = new Blob([JSON.stringify(dataToExport, null, 2)], { type: "application/json" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `business-manager-export-${new Date().toISOString().split("T")[0]}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-    } catch (error) {
-      console.error("Failed to export data:", error)
-      alert("Failed to export data. Please try again.")
     }
   }
 
@@ -799,22 +794,9 @@ Thank you for your business!
       // Simulate reset process with a delay
       await new Promise((resolve) => setTimeout(resolve, 2000))
 
-      // Clear all data from localStorage
-      localStorage.removeItem("business-manager-data")
-      localStorage.removeItem("daily-reset-data")
-
-      // Reset all state variables to initial values
-      setModules([])
-      setTransactions([])
-      setCalculatorHistory([])
-      setCart([])
-      setCustomQuantities({})
-      // Note: Currency is now managed through Redux settings
-      setLastSaved(null)
-      setDailyReset({
-        lastResetDate: new Date().toDateString(),
-        todaysSalesReset: false,
-      })
+      // Clear all data using Redux
+      dispatch(clearAllData())
+      
       setExpandedModule(null)
       setSelectedModule(null)
       setCalculatorDisplay("0")
@@ -824,6 +806,10 @@ Thank you for your business!
       // Show success notification
       setTimeout(() => {
         setIsResetting(false)
+        dispatch(showNotification({
+          type: 'success',
+          message: 'All business data has been reset successfully!'
+        }))
         alert("All business data has been successfully reset!")
       }, 500)
     } catch (error) {
@@ -850,10 +836,10 @@ Thank you for your business!
                   <Badge className="bg-blue-100 text-blue-800 border-blue-200">Universal CRM</Badge>
                   {lastSaved && (
                     <Badge className="bg-gray-100 text-gray-600 border-gray-200 text-xs">
-                      Last saved: {lastSaved.toLocaleTimeString()}
+                      Last saved: {new Date(lastSaved).toLocaleTimeString()}
                     </Badge>
                   )}
-                  {dailyReset.todaysSalesReset && (
+                  {dailyReset?.todaysSalesReset && (
                     <Badge className="bg-blue-100 text-blue-600 border-blue-200 text-xs">
                       <Clock className="h-3 w-3 mr-1" />
                       Daily Reset: {dailyReset.lastResetDate}
@@ -985,9 +971,7 @@ Thank you for your business!
                         <Button
                           onClick={() => {
                             if (newModule.name && newModule.totalStock && newModule.pricePerUnit) {
-                              addBusinessModule(newModule)
-                              setNewModule({})
-                              setShowAddModuleDialog(false)
+                              handleAddModule()
                             }
                           }}
                           className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
@@ -1026,7 +1010,7 @@ Thank you for your business!
                 <div className="flex items-center mt-1">
                   <Clock className="h-3 w-3 text-blue-600 mr-1" />
                   <p className="text-xs text-blue-600">
-                    {dailyReset.todaysSalesReset ? "Reset at 12:00 AM" : "Resets at midnight"}
+                    {dailyReset?.todaysSalesReset ? "Reset at 12:00 AM" : "Resets at midnight"}
                   </p>
                 </div>
               </CardContent>
@@ -1208,7 +1192,7 @@ Thank you for your business!
                                 <Button
                                   size="sm"
                                   className="bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                  onClick={() => removeFromCart(module.id, 1)}
+                                  onClick={() => removeFromCartHandler(module.id, 1)}
                                   disabled={cartQuantity === 0}
                                 >
                                   <Minus className="h-4 w-4" />
@@ -1219,7 +1203,7 @@ Thank you for your business!
                                 <Button
                                   size="sm"
                                   className="bg-gray-200 text-gray-700 hover:bg-gray-300"
-                                  onClick={() => addToCart(module, 1)}
+                                  onClick={() => addToCartHandler(module, 1)}
                                   disabled={module.totalStock <= cartQuantity}
                                 >
                                   <Plus className="h-4 w-4" />
@@ -1775,7 +1759,7 @@ Thank you for your business!
               Cancel
             </Button>
             <Button
-              onClick={() => moduleToDelete && deleteModule(moduleToDelete)}
+              onClick={() => moduleToDelete && handleDeleteModule()}
               className="bg-red-600 hover:bg-red-700 text-white flex-1"
             >
               <Trash2 className="h-4 w-4 mr-2" />
@@ -1881,7 +1865,7 @@ Thank you for your business!
               >
                 Cancel
               </Button>
-              <Button onClick={clearCart} className="bg-red-600 hover:bg-red-700 text-white flex-1">
+              <Button onClick={clearCartData} className="bg-red-600 hover:bg-red-700 text-white flex-1">
                 <Trash2 className="h-4 w-4 mr-2" />
                 Clear Cart
               </Button>

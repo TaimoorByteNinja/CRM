@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Craft CRM Icon</title>
+</head>
+<body>
+    <h2>Generating Craft CRM Icon...</h2>
+    <canvas id="iconCanvas" width="256" height="256" style="border: 1px solid #ccc;"></canvas>
+    <br><br>
+    <button id="downloadBtn">Download PNG Icon</button>
+    
+    <script>
+        const canvas = document.getElementById('iconCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas
+        ctx.clearRect(0, 0, 256, 256);
+        
+        // Draw blue background with rounded corners
+        ctx.fillStyle = '#2563eb';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 256, 256, 45);
+        ctx.fill();
+        
+        // Draw white rotated square border in center
+        ctx.save();
+        ctx.translate(128, 128); // Move to center
+        ctx.rotate(12 * Math.PI / 180); // Rotate 12 degrees
+        
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 16; // Thicker for 256x256
+        ctx.beginPath();
+        ctx.rect(-40, -40, 80, 80); // 80x80 square centered
+        ctx.stroke();
+        
+        ctx.restore();
+        
+        // Auto-download function
+        function downloadIcon() {
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'craft-crm-icon.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+        
+        // Add click handler
+        document.getElementById('downloadBtn').addEventListener('click', downloadIcon);
+        
+        // Auto-generate and download
+        setTimeout(() => {
+            console.log('Auto-generating icon...');
+            downloadIcon();
+        }, 1000);
+    </script>
+</body>
+</html>

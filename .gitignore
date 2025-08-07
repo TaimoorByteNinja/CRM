@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Electron build files
+dist/
+business-hub-installer.exe
+craft-crm-installer.exe
+
+# Generated icons and assets
+*.ico
+*.png
+!public/*.png
+!public/*.ico

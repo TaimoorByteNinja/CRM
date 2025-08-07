@@ -37,10 +37,11 @@ interface Item {
 interface NewSaleDialogProps {
   trigger?: React.ReactNode,
   open?: boolean,
-  onOpenChange?: (open: boolean) => void
+  onOpenChange?: (open: boolean) => void,
+  onSave?: () => void
 }
 
-export function NewSaleDialog({ trigger, open, onOpenChange }: NewSaleDialogProps) {
+export function NewSaleDialog({ trigger, open, onOpenChange, onSave }: NewSaleDialogProps) {
   const dispatch = useAppDispatch()
   const items = useAppSelector(selectAllItems)
   const generalSettings = useAppSelector(selectGeneralSettings)
@@ -69,9 +70,16 @@ export function NewSaleDialog({ trigger, open, onOpenChange }: NewSaleDialogProp
   // Fetch items on dialog open
   useEffect(() => {
     if (dialogOpen) {
+      console.log('🔄 NewSaleDialog: Dialog opened, fetching items...');
       dispatch(fetchItems());
     }
   }, [dialogOpen, dispatch]);
+
+  // Debug: Log items when they change
+  useEffect(() => {
+    console.log('📦 NewSaleDialog: Items loaded:', items.length, 'items');
+    console.log('📦 NewSaleDialog: Sample items:', items.slice(0, 3));
+  }, [items]);
 
   // Close suggestions when clicking outside
   useEffect(() => {
@@ -198,6 +206,11 @@ export function NewSaleDialog({ trigger, open, onOpenChange }: NewSaleDialogProp
       dispatch(showNotification({ message: 'Sale created successfully!', type: 'success' }));
       setDialogOpen(false);
       
+      // Call onSave callback to refresh data
+      if (onSave) {
+        onSave();
+      }
+      
       // Create a complete sale object for invoice generation
       const completeInvoiceSale = {
         ...savedSale,
@@ -270,6 +283,8 @@ export function NewSaleDialog({ trigger, open, onOpenChange }: NewSaleDialogProp
     setItemQuantity(1);
     setItemPrice(0);
     setItemDiscount(0);
+    setItemSearchTerm(""); // Clear search term
+    setShowSuggestions(false); // Hide suggestions
   };
 
   const handleItemSelect = (item: any) => {
@@ -279,11 +294,15 @@ export function NewSaleDialog({ trigger, open, onOpenChange }: NewSaleDialogProp
     setShowSuggestions(false);
   };
 
-  const filteredItems = items.filter(item => 
-    (item.name?.toLowerCase() || '').includes(itemSearchTerm.toLowerCase()) ||
-    (item.sku?.toLowerCase() || '').includes(itemSearchTerm.toLowerCase()) ||
-    (item.category?.toLowerCase() || '').includes(itemSearchTerm.toLowerCase())
-  ).slice(0, 8); // Limit to 8 suggestions
+  const filteredItems = itemSearchTerm.length > 0 
+    ? items.filter(item => 
+        (item.name?.toLowerCase() || '').includes(itemSearchTerm.toLowerCase()) ||
+        (item.sku?.toLowerCase() || '').includes(itemSearchTerm.toLowerCase()) ||
+        (item.category?.toLowerCase() || '').includes(itemSearchTerm.toLowerCase())
+      ).slice(0, 8) // Limit to 8 suggestions when searching
+    : items.slice(0, 8); // Show first 8 items when no search term
+  
+  console.log('🔍 NewSaleDialog: Search term:', itemSearchTerm, 'Filtered items:', filteredItems.length, 'Total items:', items.length);
 
   const defaultTrigger = (
     <Button className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
@@ -358,9 +377,9 @@ export function NewSaleDialog({ trigger, open, onOpenChange }: NewSaleDialogProp
                     value={itemSearchTerm}
                     onChange={(e) => {
                       setItemSearchTerm(e.target.value);
-                      setShowSuggestions(e.target.value.length > 0);
+                      setShowSuggestions(true); // Always show suggestions when typing
                     }}
-                    onFocus={() => setShowSuggestions(itemSearchTerm.length > 0)}
+                    onFocus={() => setShowSuggestions(true)} // Show all items when focused
                   />
                   {itemSearchTerm && (
                     <button
@@ -377,28 +396,34 @@ export function NewSaleDialog({ trigger, open, onOpenChange }: NewSaleDialogProp
                 </div>
                 
                 {/* Suggestions Dropdown */}
-                {showSuggestions && filteredItems.length > 0 && (
+                {showSuggestions && (
                   <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg overflow-y-auto" style={{ maxHeight: '180px', maxWidth: '100%', right: '0' }}>
-                    {filteredItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        onClick={() => handleItemSelect(item)}
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{item.name || 'Unnamed Item'}</div>
-                            <div className="text-sm text-gray-500">
-                              SKU: {item.sku || 'N/A'} | Category: {item.category || 'N/A'}
+                    {filteredItems.length > 0 ? (
+                      filteredItems.map((item) => (
+                        <div
+                          key={item.id}
+                          className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          onClick={() => handleItemSelect(item)}
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="flex-1">
+                              <div className="font-medium text-gray-900">{item.name || 'Unnamed Item'}</div>
+                              <div className="text-sm text-gray-500">
+                                SKU: {item.sku || 'N/A'} | Category: {item.category || 'N/A'}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-medium text-gray-900">{formatCurrency(item.price || 0)}</div>
+                              <div className="text-sm text-gray-500">Stock: {item.stock || 0}</div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-medium text-gray-900">{formatCurrency(item.price || 0)}</div>
-                            <div className="text-sm text-gray-500">Stock: {item.stock || 0}</div>
-                          </div>
                         </div>
+                      ))
+                    ) : (
+                      <div className="px-4 py-3 text-center text-gray-500">
+                        {items.length === 0 ? 'Loading items...' : 'No items found'}
                       </div>
-                    ))}
+                    )}
                   </div>
                 )}
               </div>

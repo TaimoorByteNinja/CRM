@@ -365,14 +365,14 @@ export default function ItemsPage() {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Button className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
+                {/* <Button className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Sale
                 </Button>
                 <Button className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Purchase
-                </Button>
+                </Button> */}
                 <Button className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200">
                   <Plus className="h-4 w-4" />
                 </Button>

@@ -61,8 +61,10 @@ export async function GET(req: NextRequest) {
 
     // Parallel fetch all data from USER-SPECIFIC tables
     const [
-      salesData,
-      todaysSalesData,
+      businessTransactionSalesData,
+      userSalesData,
+      todaysBusinessTransactionSalesData,
+      todaysUserSalesData,
       purchasesData,
       itemsData,
       partiesData,
@@ -70,11 +72,35 @@ export async function GET(req: NextRequest) {
       expensesData,
       salesSummaryData
     ] = await Promise.all([
-      // Total Sales from user_sales table
+      // Total Sales from user_business_transactions table (business manager sales)
+      supabase
+        .from('user_business_transactions')
+        .select('*')
+        .eq('phone_number', phoneNumber)
+        .eq('type', 'sale')
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return data || [];
+        }),
+
+      // Total Sales from user_sales table (direct sales page)
       supabase
         .from('user_sales')
         .select('*')
         .eq('phone_number', phoneNumber)
+        .then(({ data, error }) => {
+          if (error) throw error;
+          return data || [];
+        }),
+
+      // Today's Sales from user_business_transactions table
+      supabase
+        .from('user_business_transactions')
+        .select('*')
+        .eq('phone_number', phoneNumber)
+        .eq('type', 'sale')
+        .gte('timestamp', `${today}T00:00:00`)
+        .lte('timestamp', `${today}T23:59:59`)
         .then(({ data, error }) => {
           if (error) throw error;
           return data || [];
@@ -155,18 +181,45 @@ export async function GET(req: NextRequest) {
         })
     ]);
 
-    // Calculate metrics
-    const totalSales = salesData.reduce((sum, sale) => {
-      const amount = sale.total_amount || 
-                   (sale.subtotal || 0) + (sale.tax || 0) - (sale.discount || 0);
+    // Calculate metrics by combining data from both sales tables
+    console.log('📊 Overview: Calculating combined sales metrics...');
+    console.log('Business Transaction Sales:', businessTransactionSalesData.length);
+    console.log('User Sales:', userSalesData.length);
+
+    // Combine and calculate total sales from both tables
+    const businessTransactionTotal = businessTransactionSalesData.reduce((sum: number, sale: any) => {
+      const amount = sale.total_price || 0;
       return sum + amount;
     }, 0);
 
-    const todaysSales = todaysSalesData.reduce((sum, sale) => {
-      const amount = sale.total_amount || 
-                   (sale.subtotal || 0) + (sale.tax || 0) - (sale.discount || 0);
+    const userSalesTotal = userSalesData.reduce((sum: number, sale: any) => {
+      const amount = sale.total_amount || 0;
       return sum + amount;
     }, 0);
+
+    const totalSales = businessTransactionTotal + userSalesTotal;
+
+    // Combine and calculate today's sales from both tables
+    const todaysBusinessTransactionTotal = todaysBusinessTransactionSalesData.reduce((sum: number, sale: any) => {
+      const amount = sale.total_price || 0;
+      return sum + amount;
+    }, 0);
+
+    const todaysUserSalesTotal = todaysUserSalesData.reduce((sum: number, sale: any) => {
+      const amount = sale.total_amount || 0;
+      return sum + amount;
+    }, 0);
+
+    const todaysSales = todaysBusinessTransactionTotal + todaysUserSalesTotal;
+
+    console.log('💰 Overview: Sales calculation results:', {
+      businessTransactionTotal,
+      userSalesTotal,
+      totalSales,
+      todaysBusinessTransactionTotal,
+      todaysUserSalesTotal,
+      todaysSales
+    });
 
     const totalPurchases = purchasesData.reduce((sum, purchase) => {
       const amount = purchase.total_amount || 
@@ -253,9 +306,9 @@ export async function GET(req: NextRequest) {
       totalParties: partiesData.length,
       
       // Transaction counts
-      totalSalesCount: salesData.length,
+      totalSalesCount: businessTransactionSalesData.length + userSalesData.length,
       totalPurchasesCount: purchasesData.length,
-      todaysSalesCount: todaysSalesData.length,
+      todaysSalesCount: todaysBusinessTransactionSalesData.length + todaysUserSalesData.length,
       
       // Additional metadata
       lastUpdated: new Date().toISOString(),

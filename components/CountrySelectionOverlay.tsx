@@ -118,6 +118,9 @@ export function CountrySelectionOverlay({ isOpen, onClose }: CountrySelectionOve
         // Still close the dialog even if there's an error
       }
       
+      // Mark that user has completed the country selection
+      localStorage.setItem('hasSeenCountrySelection', 'true')
+      
       onClose()
     }
   }

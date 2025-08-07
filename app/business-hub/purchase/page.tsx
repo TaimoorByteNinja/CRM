@@ -309,14 +309,19 @@ export default function PurchasePage() {
                   variant="outline"
                   size="sm"
                   className="rounded-xl border-gray-200 hover:bg-gray-50 transition-all duration-200 bg-transparent flex items-center"
-                  onClick={() => {
-                    dispatch(fetchPurchases())
-                    dispatch(fetchPurchaseReturns())
-                    dispatch(fetchExpenses())
+                  onClick={async () => {
+                    setIsLoading(true)
+                    await Promise.all([
+                      dispatch(fetchPurchases()),
+                      dispatch(fetchPurchaseReturns()),
+                      dispatch(fetchExpenses())
+                    ])
+                    setIsLoading(false)
                   }}
                   title="Refresh"
+                  disabled={isLoading}
                 >
-                  <RefreshCw className="h-4 w-4 mr-1" />
+                  <RefreshCw className={`h-4 w-4 mr-1${isLoading ? " animate-spin" : ""}`} />
                   Refresh
                 </Button>
                 <DropdownMenu>

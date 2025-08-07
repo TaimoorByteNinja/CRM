@@ -384,4 +384,16 @@ export const apiClient = {
       return response.json();
     },
   },
+
+  // Recent Transactions API
+  recentTransactions: {
+    async getRecent(limit: number = 10, phone?: string) {
+      const url = addPhoneParam(`${API_BASE}/recent-transactions?limit=${limit}`, phone);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch recent transactions: ${response.statusText}`);
+      }
+      return response.json();
+    },
+  },
 };

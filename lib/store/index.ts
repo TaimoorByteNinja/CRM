@@ -16,6 +16,7 @@ import loanAccountsReducer from './slices/loanAccountsSlice';
 import reportsReducer from './slices/reportsSlice';
 import settingsReducer from './slices/settingsSlice';
 import utilitiesReducer from './slices/utilitiesSlice';
+import businessManagerReducer from './slices/businessManagerSlice';
 
 export const store = configureStore({
   reducer: {
@@ -36,6 +37,7 @@ export const store = configureStore({
     reports: reportsReducer,
     settings: settingsReducer,
     utilities: utilitiesReducer,
+    businessManager: businessManagerReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

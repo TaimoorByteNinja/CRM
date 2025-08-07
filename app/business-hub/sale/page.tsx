@@ -177,14 +177,14 @@ export default function SalePage() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <Button 
+                {/* <Button 
                   variant="outline" 
                   onClick={createSampleData}
                   className="bg-blue-50 hover:bg-blue-100 text-blue-600 border-blue-200"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Sample Data
-                </Button>
+                </Button> */}
                 <InvoiceCustomizationDialog>
                   <Button className="bg-green-600 hover:bg-green-700">
                     <Printer className="h-4 w-4 mr-2" />

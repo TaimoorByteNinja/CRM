@@ -1,690 +1,369 @@
 "use client"
 
 import type React from "react"
-
-import { useState, useRef, useCallback } from "react"
+import { useState, useEffect } from "react"
+import { useAppSelector, useAppDispatch } from "@/lib/store/hooks"
+import { selectGeneralSettings, updateGeneralSettings } from "@/lib/store/slices/settingsSlice"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import {
-  Cloud,
-  Download,
-  Upload,
-  RefreshCw,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
   Settings,
-  Users,
-  Shield,
-  Calendar,
-  HardDrive,
+  Phone,
+  User,
+  Info,
+  RefreshCw,
+  Trash2,
+  Eye,
+  Database,
   Smartphone,
   Globe,
-  Share2,
-  Database,
-  Info,
-  X,
-  CloudUpload,
-  FolderOpen,
-  History,
-  Timer,
-  Wifi,
+  Monitor,
+  Code,
+  Zap,
 } from "lucide-react"
 import { CollapsibleSidebar } from "@/components/collapsible-sidebar"
+import { useUserData } from "@/hooks/use-user-data"
 
-export default function SyncShareBackupPage() {
+export default function SyncPage() {
   const [activeTab, setActiveTab] = useState("sync")
-  const [autoBackup, setAutoBackup] = useState(true)
-  const [transactionHistory, setTransactionHistory] = useState(true)
-  const [backupFrequency, setBackupFrequency] = useState("daily")
-  const [backupProgress, setBackupProgress] = useState(0)
-  const [isBackingUp, setIsBackingUp] = useState(false)
-  const [isRestoring, setIsRestoring] = useState(false)
-  const [showRestoreDialog, setShowRestoreDialog] = useState(false)
-  const [showCloudDialog, setShowCloudDialog] = useState(false)
-  const [cloudProvider, setCloudProvider] = useState("")
-  const [isCloudConnected, setIsCloudConnected] = useState(false)
-  const [syncEnabled, setSyncEnabled] = useState(false)
-  const [lastBackup, setLastBackup] = useState("09/07/2025 | 04:07 PM")
-  const [nextBackup, setNextBackup] = useState("10/07/2025 | 04:07 PM")
-  const [backupSize, setBackupSize] = useState("2.4 MB")
-  const [connectedDevices, setConnectedDevices] = useState(3)
-  const [staffMembers, setStaffMembers] = useState(5)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const dispatch = useAppDispatch()
+  const generalSettings = useAppSelector(selectGeneralSettings)
+  const { currentUser, isNewUser } = useUserData()
+  const [mounted, setMounted] = useState(false)
+  const [showCountrySelection, setShowCountrySelection] = useState(false)
+  const [tempPhoneNumber, setTempPhoneNumber] = useState('')
 
-  // Simulate backup to computer
-  const handleBackupToComputer = useCallback(async () => {
-    setIsBackingUp(true)
-    setBackupProgress(0)
+  useEffect(() => {
+    setMounted(true)
+    setTempPhoneNumber(generalSettings.phoneNumber || '')
+  }, [generalSettings.phoneNumber])
 
-    // Simulate progress
-    const interval = setInterval(() => {
-      setBackupProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsBackingUp(false)
+  const handleClearPhone = () => {
+    console.log('🔄 Clearing phone number...')
+    dispatch(updateGeneralSettings({ phoneNumber: '' }))
+    setShowCountrySelection(true)
+    setTempPhoneNumber('')
+  }
 
-          // Generate and download backup file
-          const backupData = {
-            timestamp: new Date().toISOString(),
-            version: "1.0.0",
-            data: {
-              parties: [],
-              items: [],
-              transactions: [],
-              settings: {},
-            },
-          }
-
-          const blob = new Blob([JSON.stringify(backupData, null, 2)], {
-            type: "application/json",
-          })
-          const url = URL.createObjectURL(blob)
-          const a = document.createElement("a")
-          a.href = url
-          a.download = `business-backup-${new Date().toISOString().split("T")[0]}.json`
-          document.body.appendChild(a)
-          a.click()
-          document.body.removeChild(a)
-          URL.revokeObjectURL(url)
-
-          return 100
-        }
-        return prev + 10
-      })
-    }, 200)
-  }, [])
-
-  // Handle cloud backup
-  const handleCloudBackup = useCallback(async () => {
-    if (!cloudProvider) {
-      setShowCloudDialog(true)
-      return
+  const handleSetPhone = () => {
+    if (tempPhoneNumber) {
+      dispatch(updateGeneralSettings({ phoneNumber: tempPhoneNumber }))
     }
+  }
 
-    setIsBackingUp(true)
-    setBackupProgress(0)
-
-    // Simulate cloud upload
-    const interval = setInterval(() => {
-      setBackupProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval)
-          setIsBackingUp(false)
-          setIsCloudConnected(true)
-          return 100
-        }
-        return prev + 8
-      })
-    }, 300)
-  }, [cloudProvider])
-
-  // Handle restore backup
-  const handleRestoreBackup = useCallback(() => {
-    setShowRestoreDialog(true)
-  }, [])
-
-  const confirmRestore = useCallback(async () => {
-    setShowRestoreDialog(false)
-    setIsRestoring(true)
-
-    // Simulate restore process
-    setTimeout(() => {
-      setIsRestoring(false)
-      setLastBackup(new Date().toLocaleString())
-    }, 3000)
-  }, [])
-
-  // Handle file upload for restore
-  const handleFileUpload = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file) {
-      // Validate file type
-      if (file.type === "application/json" || file.name.endsWith(".json")) {
-        setShowRestoreDialog(true)
-      } else {
-        alert("Please select a valid JSON backup file.")
-      }
-    }
-  }, [])
-
-  // Enable sync functionality
-  const handleEnableSync = useCallback(() => {
-    setSyncEnabled(true)
-    // Simulate sync setup
-    setTimeout(() => {
-      setConnectedDevices((prev) => prev + 1)
-    }, 1000)
-  }, [])
+  const handleShowForm = () => {
+    setShowCountrySelection(true)
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="flex h-screen">
       <CollapsibleSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      <div className="ml-16 transition-all duration-300">
+      
+      <div className="flex-1 flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
         {/* Header */}
-        <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200/60 px-6 py-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-white/90 backdrop-blur-sm border-b border-slate-200 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl shadow-lg">
+              <Code className="h-6 w-6 text-white" />
+            </div>
             <div>
               <h1 className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
-                Sync, Share & Backup
+                System Debug & Configuration
               </h1>
-              <p className="text-slate-600 mt-1">Secure your data and collaborate with your team</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Badge variant={syncEnabled ? "default" : "secondary"} className="px-3 py-1">
-                <Wifi className="h-3 w-3 mr-1" />
-                {syncEnabled ? "Sync Active" : "Sync Disabled"}
-              </Badge>
-              <Badge variant="outline" className="px-3 py-1">
-                <Database className="h-3 w-3 mr-1" />
-                {backupSize}
-              </Badge>
+              <p className="text-slate-600 text-sm">Monitor and manage your application settings</p>
             </div>
           </div>
         </div>
 
-        <div className="p-6 space-y-6">
-          {/* Sync & Share Section */}
-          <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
-                  <Share2 className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Sync & Share</CardTitle>
-                  <CardDescription>Give access to your staff and sync across devices</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {!syncEnabled ? (
-                <div className="text-center py-8">
-                  <div className="mb-6">
-                    <img
-                      src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-mAHSAgKvKiy7azhxxw4tdaKqahVXvL.png"
-                      alt="Sync illustration"
-                      className="mx-auto h-48 w-auto opacity-90"
-                    />
-                  </div>
-                  <h3 className="text-xl font-semibold text-slate-900 mb-2">Give Access To Your Staff</h3>
-                  <p className="text-slate-600 mb-6 max-w-md mx-auto">
-                    Share your company with your staff in a secure manner by assigning roles.
-                  </p>
-                  <Button
-                    onClick={handleEnableSync}
-                    className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-8 py-3 rounded-full text-lg font-semibold shadow-lg hover:shadow-xl transition-all"
-                  >
-                    Enable Sync
-                  </Button>
-                  <p className="text-sm text-slate-500 mt-4">*You're logged in with 3034091907</p>
-                </div>
-              ) : (
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                      <div className="flex items-center gap-3">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                        <div>
-                          <p className="font-medium text-green-900">Sync Enabled</p>
-                          <p className="text-sm text-green-700">Real-time data synchronization active</p>
-                        </div>
-                      </div>
-                      <Switch checked={syncEnabled} onCheckedChange={setSyncEnabled} />
+        {/* Main Content */}
+        <div className="flex-1 p-6 overflow-auto">
+          <div className="max-w-4xl mx-auto space-y-6">
+            
+            {/* Status Overview Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-full">
+                      <Phone className="h-6 w-6 text-blue-600" />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Smartphone className="h-4 w-4 text-blue-600" />
-                          <span className="text-sm font-medium text-blue-900">Connected Devices</span>
-                        </div>
-                        <p className="text-2xl font-bold text-blue-600">{connectedDevices}</p>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-600 mb-1">Phone Number Status</p>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={generalSettings.phoneNumber ? "default" : "destructive"} 
+                          className={`${generalSettings.phoneNumber ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'} px-3 py-1`}
+                        >
+                          {generalSettings.phoneNumber ? "Connected" : "Not Set"}
+                        </Badge>
                       </div>
-
-                      <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Users className="h-4 w-4 text-purple-600" />
-                          <span className="text-sm font-medium text-purple-900">Staff Members</span>
-                        </div>
-                        <p className="text-2xl font-bold text-purple-600">{staffMembers}</p>
-                      </div>
+                      <p className="text-xs text-slate-500 mt-1 font-mono">
+                        {generalSettings.phoneNumber || 'No phone number configured'}
+                      </p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
 
-                  <div className="space-y-4">
-                    <Button variant="outline" className="w-full justify-start bg-transparent">
-                      <Users className="h-4 w-4 mr-2" />
-                      Manage Staff Access
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start bg-transparent">
-                      <Shield className="h-4 w-4 mr-2" />
-                      Role Permissions
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start bg-transparent">
-                      <Globe className="h-4 w-4 mr-2" />
-                      Sync Settings
-                    </Button>
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gradient-to-br from-green-100 to-green-200 rounded-full">
+                      <User className="h-6 w-6 text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-600 mb-1">User Status</p>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={isNewUser === true ? "secondary" : isNewUser === false ? "default" : "outline"} 
+                          className={`${
+                            isNewUser === true ? 'bg-blue-100 text-blue-800 border-blue-200' : 
+                            isNewUser === false ? 'bg-green-100 text-green-800 border-green-200' : 
+                            'bg-gray-100 text-gray-800 border-gray-200'
+                          } px-3 py-1`}
+                        >
+                          {isNewUser === null ? "Unknown" : (isNewUser ? "New User" : "Existing User")}
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1 font-mono">
+                        {currentUser || 'No user identified'}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                </CardContent>
+              </Card>
 
-          {/* Auto Backup Section */}
-          <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-green-500 to-teal-600 rounded-lg">
-                  <RefreshCw className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Auto Backup</CardTitle>
-                  <CardDescription>Automatically backup your data at scheduled intervals</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-4 bg-gradient-to-r from-slate-50 to-gray-50 rounded-lg border border-slate-200">
-                <div className="flex items-center gap-3">
-                  <Timer className="h-5 w-5 text-slate-600" />
-                  <div>
-                    <Label htmlFor="auto-backup" className="text-base font-medium">
-                      Enable Auto Backup
+              <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-lg hover:shadow-xl transition-all duration-300">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-gradient-to-br from-purple-100 to-purple-200 rounded-full">
+                      <Monitor className="h-6 w-6 text-purple-600" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-600 mb-1">Development Mode</p>
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant="secondary"
+                          className="bg-purple-100 text-purple-800 border-purple-200 px-3 py-1"
+                        >
+                          Active
+                        </Badge>
+                      </div>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Debug panel enabled
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* System Information */}
+            <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg">
+                    <Info className="h-5 w-5 text-white" />
+                  </div>
+                  Current System Information
+                </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Real-time system status and configuration details
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                      <Smartphone className="h-4 w-4" />
+                      Phone Number
                     </Label>
-                    <p className="text-sm text-slate-600">Automatically backup data based on schedule</p>
+                    <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+                      <div className={`w-3 h-3 rounded-full ${generalSettings.phoneNumber ? 'bg-green-400' : 'bg-red-400'}`} />
+                      <span className={`font-mono text-sm flex-1 ${generalSettings.phoneNumber ? 'text-green-700' : 'text-red-600'}`}>
+                        {generalSettings.phoneNumber || 'Not Set'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                      <User className="h-4 w-4" />
+                      Current User ID
+                    </Label>
+                    <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+                      <div className={`w-3 h-3 rounded-full ${currentUser ? 'bg-green-400' : 'bg-gray-400'}`} />
+                      <span className={`font-mono text-sm flex-1 ${currentUser ? 'text-green-700' : 'text-slate-500'}`}>
+                        {currentUser || 'None'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      User Type
+                    </Label>
+                    <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+                      <div className={`w-3 h-3 rounded-full ${
+                        isNewUser === true ? 'bg-blue-400' : 
+                        isNewUser === false ? 'bg-green-400' : 
+                        'bg-gray-400'
+                      }`} />
+                      <span className={`text-sm flex-1 ${
+                        isNewUser === true ? 'text-blue-700' : 
+                        isNewUser === false ? 'text-green-700' : 
+                        'text-slate-500'
+                      }`}>
+                        {isNewUser === null ? 'Unknown Status' : (isNewUser ? 'New User' : 'Existing User')}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-3">
+                    <Label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                      <Eye className="h-4 w-4" />
+                      Country Form
+                    </Label>
+                    <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl border border-slate-200">
+                      <div className={`w-3 h-3 rounded-full ${showCountrySelection ? 'bg-blue-400' : 'bg-gray-400'}`} />
+                      <span className={`text-sm flex-1 ${showCountrySelection ? 'text-blue-700' : 'text-slate-500'}`}>
+                        {showCountrySelection ? 'Visible' : 'Hidden'}
+                      </span>
+                    </div>
                   </div>
                 </div>
-                <Switch id="auto-backup" checked={autoBackup} onCheckedChange={setAutoBackup} />
-              </div>
-
-              {autoBackup && (
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-slate-700 mb-2 block">Backup Frequency</Label>
-                      <Select value={backupFrequency} onValueChange={setBackupFrequency}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="hourly">Every Hour</SelectItem>
-                          <SelectItem value="daily">Daily</SelectItem>
-                          <SelectItem value="weekly">Weekly</SelectItem>
-                          <SelectItem value="monthly">Monthly</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                      <CheckCircle className="h-4 w-4 text-blue-600" />
-                      <div>
-                        <p className="text-sm font-medium text-blue-900">Transaction History</p>
-                        <Switch checked={transactionHistory} onCheckedChange={setTransactionHistory} className="mt-1" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg border border-green-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Clock className="h-4 w-4 text-green-600" />
-                        <span className="text-sm font-medium text-green-900">Last Backup</span>
-                      </div>
-                      <p className="text-lg font-semibold text-green-700">{lastBackup}</p>
-                    </div>
-
-                    <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 rounded-lg border border-orange-200">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Calendar className="h-4 w-4 text-orange-600" />
-                        <span className="text-sm font-medium text-orange-900">Next Backup</span>
-                      </div>
-                      <p className="text-lg font-semibold text-orange-700">{nextBackup}</p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Manual Backup Options */}
-          <div className="grid md:grid-cols-2 gap-6">
-            {/* Backup to Computer */}
-            <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg">
-              <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-600 rounded-lg">
-                    <HardDrive className="h-5 w-5 text-white" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg">Backup to Computer</CardTitle>
-                    <CardDescription>Download backup file to your local machine</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {isBackingUp && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Creating backup...</span>
-                      <span className="font-medium">{backupProgress}%</span>
-                    </div>
-                    <Progress value={backupProgress} className="h-2" />
-                  </div>
-                )}
-
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="text-sm text-slate-600">Backup Size</span>
-                    <span className="font-medium">{backupSize}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <span className="text-sm text-slate-600">Format</span>
-                    <Badge variant="outline">JSON</Badge>
-                  </div>
-                </div>
-
-                <Button
-                  onClick={handleBackupToComputer}
-                  disabled={isBackingUp}
-                  className="w-full bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700"
-                >
-                  {isBackingUp ? (
-                    <>
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Creating Backup...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Backup
-                    </>
-                  )}
-                </Button>
               </CardContent>
             </Card>
 
-            {/* Backup to Cloud */}
-            <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg">
+            {/* Phone Number Management */}
+            <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-lg">
               <CardHeader className="pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-600 rounded-lg">
-                    <Cloud className="h-5 w-5 text-white" />
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg">
+                    <Phone className="h-5 w-5 text-white" />
                   </div>
-                  <div>
-                    <CardTitle className="text-lg">Backup to Cloud</CardTitle>
-                    <CardDescription>Save backup to Google Drive, OneDrive, or Dropbox</CardDescription>
-                  </div>
-                </div>
+                  Phone Number Management
+                </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Update or manage the system phone number configuration
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {isCloudConnected ? (
-                  <Alert className="border-green-200 bg-green-50">
-                    <CheckCircle className="h-4 w-4 text-green-600" />
-                    <AlertDescription className="text-green-800">
-                      Connected to {cloudProvider}. Last backup: {lastBackup}
-                    </AlertDescription>
-                  </Alert>
-                ) : (
-                  <Alert className="border-orange-200 bg-orange-50">
-                    <Info className="h-4 w-4 text-orange-600" />
-                    <AlertDescription className="text-orange-800">
-                      Connect to a cloud provider to enable automatic cloud backups
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {isBackingUp && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-slate-600">Uploading to cloud...</span>
-                      <span className="font-medium">{backupProgress}%</span>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <Label htmlFor="phone-input" className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-blue-500" />
+                    Set Phone Number
+                  </Label>
+                  <div className="flex gap-3">
+                    <div className="flex-1 relative">
+                      <Input
+                        id="phone-input"
+                        type="text"
+                        placeholder="Enter phone number (e.g., +923034091907)"
+                        value={tempPhoneNumber}
+                        onChange={(e) => setTempPhoneNumber(e.target.value)}
+                        className="h-12 pl-4 pr-4 bg-gradient-to-r from-white to-slate-50 border-slate-300 focus:border-blue-400 focus:ring-blue-400"
+                      />
                     </div>
-                    <Progress value={backupProgress} className="h-2" />
-                  </div>
-                )}
-
-                <div className="space-y-2">
-                  <Button
-                    onClick={handleCloudBackup}
-                    disabled={isBackingUp}
-                    className="w-full bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700"
-                  >
-                    {isBackingUp ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      <>
-                        <CloudUpload className="h-4 w-4 mr-2" />
-                        {isCloudConnected ? "Backup Now" : "Connect & Backup"}
-                      </>
-                    )}
-                  </Button>
-
-                  {isCloudConnected && (
-                    <Button
-                      variant="outline"
-                      className="w-full bg-transparent"
-                      onClick={() => setShowCloudDialog(true)}
+                    <Button 
+                      onClick={handleSetPhone}
+                      disabled={!tempPhoneNumber || tempPhoneNumber === generalSettings.phoneNumber}
+                      className="h-12 px-6 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg"
                     >
-                      <Settings className="h-4 w-4 mr-2" />
-                      Cloud Settings
+                      <Zap className="h-4 w-4 mr-2" />
+                      Update
                     </Button>
+                  </div>
+                  {tempPhoneNumber && tempPhoneNumber !== generalSettings.phoneNumber && (
+                    <p className="text-xs text-blue-600 bg-blue-50 p-2 rounded-lg">
+                      Preview: {tempPhoneNumber} will be set as the new phone number
+                    </p>
                   )}
                 </div>
               </CardContent>
             </Card>
-          </div>
 
-          {/* Restore Backup */}
-          <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-orange-500 to-red-600 rounded-lg">
-                  <Upload className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Restore Backup</CardTitle>
-                  <CardDescription>Upload and restore from a previous backup file</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {isRestoring && (
-                <Alert className="border-blue-200 bg-blue-50">
-                  <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
-                  <AlertDescription className="text-blue-800">
-                    Restoring backup... This may take a few minutes.
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              <div className="grid md:grid-cols-2 gap-4">
-                <div className="space-y-3">
-                  <h4 className="font-medium text-slate-900">From Computer</h4>
-                  <p className="text-sm text-slate-600">Upload a backup file from your computer</p>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    onChange={handleFileUpload}
-                    accept=".json,.zip"
-                    className="hidden"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isRestoring}
-                    className="w-full"
+            {/* System Actions */}
+            <Card className="bg-white/80 backdrop-blur-sm border-slate-200/60 shadow-lg">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl">
+                  <div className="p-2 bg-gradient-to-br from-slate-600 to-slate-700 rounded-lg">
+                    <Settings className="h-5 w-5 text-white" />
+                  </div>
+                  System Actions
+                </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Execute system operations and manage application state
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <Button 
+                    onClick={handleClearPhone}
+                    variant="destructive"
+                    className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-lg"
                   >
-                    <FolderOpen className="h-4 w-4 mr-2" />
-                    Choose File
+                    <Trash2 className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Clear Phone</span>
+                  </Button>
+                  
+                  <Button 
+                    onClick={handleShowForm}
+                    className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 shadow-lg"
+                  >
+                    <Eye className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Show Form</span>
+                  </Button>
+                  
+                  <Button 
+                    onClick={() => window.location.reload()}
+                    variant="outline"
+                    className="h-16 flex flex-col items-center gap-2 bg-gradient-to-br from-slate-50 to-slate-100 border-slate-300 hover:bg-slate-200 shadow-lg"
+                  >
+                    <RefreshCw className="h-5 w-5" />
+                    <span className="text-sm font-semibold">Refresh Page</span>
                   </Button>
                 </div>
-
-                <div className="space-y-3">
-                  <h4 className="font-medium text-slate-900">From Cloud</h4>
-                  <p className="text-sm text-slate-600">Restore from your cloud storage</p>
-                  <Button
-                    variant="outline"
-                    disabled={!isCloudConnected || isRestoring}
-                    className="w-full bg-transparent"
-                  >
-                    <Cloud className="h-4 w-4 mr-2" />
-                    Restore from Cloud
-                  </Button>
-                </div>
-              </div>
-
-              <Alert className="border-amber-200 bg-amber-50">
-                <AlertTriangle className="h-4 w-4 text-amber-600" />
-                <AlertDescription className="text-amber-800">
-                  <strong>Warning:</strong> Restoring a backup will overwrite all current data. Make sure to create a
-                  backup of your current data before proceeding.
-                </AlertDescription>
-              </Alert>
-            </CardContent>
-          </Card>
-
-          {/* Backup History */}
-          <Card className="bg-white/70 backdrop-blur-sm border-slate-200/60 shadow-lg">
-            <CardHeader className="pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gradient-to-r from-indigo-500 to-blue-600 rounded-lg">
-                  <History className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-xl">Backup History</CardTitle>
-                  <CardDescription>View and manage your backup history</CardDescription>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {[
-                  { date: "09/07/2025 04:07 PM", size: "2.4 MB", type: "Auto", status: "Success" },
-                  { date: "08/07/2025 04:07 PM", size: "2.3 MB", type: "Manual", status: "Success" },
-                  { date: "07/07/2025 04:07 PM", size: "2.2 MB", type: "Auto", status: "Success" },
-                  { date: "06/07/2025 04:07 PM", size: "2.1 MB", type: "Auto", status: "Failed" },
-                ].map((backup, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`p-1 rounded-full ${backup.status === "Success" ? "bg-green-100" : "bg-red-100"}`}
-                      >
-                        {backup.status === "Success" ? (
-                          <CheckCircle className="h-3 w-3 text-green-600" />
-                        ) : (
-                          <X className="h-3 w-3 text-red-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium">{backup.date}</p>
-                        <p className="text-xs text-slate-600">
-                          {backup.type} backup • {backup.size}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={backup.status === "Success" ? "default" : "destructive"} className="text-xs">
-                        {backup.status}
-                      </Badge>
-                      {backup.status === "Success" && (
-                        <Button size="sm" variant="ghost">
-                          <Download className="h-3 w-3" />
-                        </Button>
-                      )}
+                
+                <div className="mt-6 p-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl">
+                  <div className="flex items-start gap-3">
+                    <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-800 mb-1">Action Effects</p>
+                      <ul className="text-xs text-amber-700 space-y-1">
+                        <li>• <strong>Clear Phone:</strong> Removes phone number and shows country selection</li>
+                        <li>• <strong>Show Form:</strong> Forces the country selection overlay to appear</li>
+                        <li>• <strong>Refresh Page:</strong> Reloads the page to reset any UI state</li>
+                      </ul>
                     </div>
                   </div>
-                ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Environment Information */}
+            <Alert className="border-blue-200 bg-gradient-to-r from-blue-50 to-cyan-50 shadow-lg">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <Database className="h-4 w-4 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <AlertDescription className="text-blue-800">
+                    <span className="font-semibold">Development Environment:</span> This debug panel provides real-time system monitoring and control. 
+                    All system changes are logged to the console and take effect immediately across the application.
+                  </AlertDescription>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </Alert>
+
+          </div>
         </div>
       </div>
-
-      {/* Restore Confirmation Dialog */}
-      <Dialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-amber-500" />
-              Confirm Restore
-            </DialogTitle>
-            <DialogDescription>
-              Restoring a backup will overwrite all current data. This action cannot be undone. Are you sure you want to
-              continue?
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowRestoreDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={confirmRestore} className="bg-red-600 hover:bg-red-700">
-              Yes, Restore Backup
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Cloud Provider Dialog */}
-      <Dialog open={showCloudDialog} onOpenChange={setShowCloudDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Connect Cloud Storage</DialogTitle>
-            <DialogDescription>Choose a cloud storage provider to backup your data securely.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { name: "Google Drive", icon: "🔵" },
-                { name: "OneDrive", icon: "🔷" },
-                { name: "Dropbox", icon: "🔹" },
-              ].map((provider) => (
-                <Button
-                  key={provider.name}
-                  variant={cloudProvider === provider.name ? "default" : "outline"}
-                  onClick={() => setCloudProvider(provider.name)}
-                  className="h-20 flex-col gap-2"
-                >
-                  <span className="text-2xl">{provider.icon}</span>
-                  <span className="text-sm">{provider.name}</span>
-                </Button>
-              ))}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCloudDialog(false)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                setShowCloudDialog(false)
-                handleCloudBackup()
-              }}
-              disabled={!cloudProvider}
-            >
-              Connect & Backup
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -182,6 +182,7 @@ export interface InvoiceSettings {
 
 export interface GeneralSettings {
   enablePasscode: boolean
+  passcodeSetup: boolean
   businessCurrency: string
   decimalPlaces: number
   tinNumber: boolean
@@ -312,6 +313,7 @@ const defaultInvoiceSettings: InvoiceSettings = {
 const initialState: SettingsState = {
   general: {
     enablePasscode: false,
+    passcodeSetup: false,
     businessCurrency: '₨',
     decimalPlaces: 2,
     tinNumber: false,

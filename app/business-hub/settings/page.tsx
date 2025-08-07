@@ -32,6 +32,7 @@ import {
   Layout,
 } from "lucide-react"
 import { InvoiceCustomizationDialog } from "@/components/InvoiceCustomizationDialog"
+import { PINSetupDialog } from "@/components/PINSetupDialog"
 import { formatCurrencyWithSymbol } from "@/lib/country-data"
 import { CountrySelectionOverlay } from "@/components/CountrySelectionOverlay"
 import { useSettings } from "@/hooks/use-settings"
@@ -50,6 +51,7 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState("GENERAL")
   const [searchTerm, setSearchTerm] = useState("")
   const [showCountrySetup, setShowCountrySetup] = useState(false)
+  const [showPINSetup, setShowPINSetup] = useState(false)
 
   // Use the new settings hook
   const {
@@ -79,6 +81,61 @@ export default function SettingsPage() {
     loadAll()
   }, [loadAll])
 
+  // Handle passcode toggle
+  const handlePasscodeToggle = async (checked: boolean) => {
+    if (checked) {
+      // Check if phone number is set
+      if (!generalSettings.phoneNumber) {
+        alert("Please set your phone number first in Country Setup section.")
+        return
+      }
+      
+      // Check if PIN is already set up for this phone number using Supabase
+      try {
+        const { pinService } = await import('@/lib/pin-service')
+        const hasPIN = await pinService.hasPIN(generalSettings.phoneNumber)
+        
+        if (hasPIN) {
+          // PIN already exists, just enable
+          handleGeneralSettingChange("enablePasscode", true)
+          handleGeneralSettingChange("passcodeSetup", true)
+          console.log('✅ PIN already exists for phone:', generalSettings.phoneNumber)
+        } else {
+          // No PIN exists, show setup dialog
+          console.log('📝 No PIN found for phone:', generalSettings.phoneNumber, '- showing setup dialog')
+          setShowPINSetup(true)
+        }
+      } catch (error) {
+        console.error('Error checking PIN status:', error)
+        // Fallback to localStorage check
+        const pinSetupCompleted = localStorage.getItem('pinSetupCompleted') === 'true'
+        if (pinSetupCompleted) {
+          handleGeneralSettingChange("enablePasscode", true)
+          handleGeneralSettingChange("passcodeSetup", true)
+        } else {
+          setShowPINSetup(true)
+        }
+      }
+    } else {
+      // Disable passcode
+      handleGeneralSettingChange("enablePasscode", false)
+      handleGeneralSettingChange("passcodeSetup", false)
+      
+      // Clear PIN from storage
+      localStorage.removeItem('userPIN')
+      localStorage.removeItem('pinSetupCompleted')
+      localStorage.removeItem('pinSetupDate')
+      sessionStorage.removeItem('pinVerified')
+      sessionStorage.removeItem('pinVerificationTime')
+    }
+  }
+
+  const handlePINSetupComplete = () => {
+    // PIN setup is complete, the PINSetupDialog has already saved the PIN
+    // Just update the UI state
+    setShowPINSetup(false)
+  }
+
   const formatCurrency = (amount: number) => {
     return formatCurrencyWithSymbol(amount, {
       code: generalSettings.selectedCurrency,
@@ -92,11 +149,11 @@ export default function SettingsPage() {
     { id: "GENERAL", label: "GENERAL", icon: Settings },
     { id: "TRANSACTION", label: "TRANSACTION", icon: FileText },
     { id: "PRINT", label: "PRINT", icon: Printer },
-    { id: "TAXES", label: "TAXES", icon: Calculator },
-    { id: "TRANSACTION MESSAGE", label: "TRANSACTION MESSAGE", icon: MessageSquare },
+    // { id: "TAXES", label: "TAXES", icon: Calculator },
+    // { id: "TRANSACTION MESSAGE", label: "TRANSACTION MESSAGE", icon: MessageSquare },
     { id: "PARTY", label: "PARTY", icon: Users },
-    { id: "ITEM", label: "ITEM", icon: Package },
-    { id: "SERVICE REMINDERS", label: "SERVICE REMINDERS", icon: Bell },
+    // { id: "ITEM", label: "ITEM", icon: Package },
+    // { id: "SERVICE REMINDERS", label: "SERVICE REMINDERS", icon: Bell },
     { id: "COUNTRY SETUP", label: "COUNTRY SETUP", icon: Globe },
   ]
 
@@ -114,18 +171,18 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
+              {/* <div className="flex items-center justify-between"> */}
+                {/* <div>
                   <Label className="text-sm font-medium">Enable Passcode</Label>
-                  <p className="text-xs text-gray-500">Secure your app with passcode</p>
-                </div>
-                <Switch
+                  <p className="text-xs text-gray-500">Secure your app with 4-digit PIN</p>
+                </div> */}
+                {/* <Switch
                   checked={generalSettings.enablePasscode}
-                  onCheckedChange={(checked) => handleGeneralSettingChange("enablePasscode", checked)}
-                />
-              </div>
+                  onCheckedChange={handlePasscodeToggle}
+                /> */}
+              {/* </div> */}
 
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label className="text-sm font-medium">Business Currency</Label>
                 <Select
                   value={generalSettings.businessCurrency}
@@ -141,9 +198,9 @@ export default function SettingsPage() {
                     <SelectItem value="£">£ (British Pound)</SelectItem>
                   </SelectContent>
                 </Select>
-              </div>
+              </div> */}
 
-              <div className="space-y-2">
+              {/* <div className="space-y-2">
                 <Label className="text-sm font-medium">Amount (upto Decimal Places)</Label>
                 <div className="flex items-center gap-2">
                   <Input
@@ -156,7 +213,7 @@ export default function SettingsPage() {
                   />
                   <span className="text-xs text-gray-500">e.g. 0.00</span>
                 </div>
-              </div>
+              </div> */}
 
               <div className="flex items-center justify-between">
                 <Label className="text-sm font-medium">TIN Number</Label>
@@ -201,17 +258,17 @@ export default function SettingsPage() {
             <CardTitle className="text-lg font-semibold">Backup & History</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
+            {/* <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Auto Backup</Label>
               <Switch
                 checked={generalSettings.autoBackup}
                 onCheckedChange={(checked) => handleGeneralSettingChange("autoBackup", checked)}
               />
-            </div>
+            </div> */}
 
-            <div className="text-sm text-gray-600">
+            {/* <div className="text-sm text-gray-600">
               <p>Last Backup: 09/07/2025 | 04:07 PM</p>
-            </div>
+            </div> */}
 
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Transaction History</Label>
@@ -225,7 +282,7 @@ export default function SettingsPage() {
       </div>
 
       {/* More Transactions Section */}
-      <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
+      {/* <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
         <CardHeader>
           <CardTitle className="text-lg font-semibold">More Transactions</CardTitle>
         </CardHeader>
@@ -252,7 +309,7 @@ export default function SettingsPage() {
             ))}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Customize Your View Section */}
       <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
@@ -262,13 +319,10 @@ export default function SettingsPage() {
         <CardContent>
           <div className="space-y-4">
             <div>
-              <Label className="text-sm font-medium mb-2 block">Choose Your Screen Zoom/Scale</Label>
-              <p className="text-xs text-gray-500 mb-4">
-                You can use this setting to resize the Vyapar screen, making it larger or smaller to fit your
-                preferences.
-              </p>
+              <Label className="text-sm font-medium mb-2 block">Screen Zoom/Scale is comming soon :)</Label>
+              
             </div>
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <div className="flex justify-between text-xs text-gray-500">
                 <span>70%</span>
                 <span>80%</span>
@@ -292,7 +346,7 @@ export default function SettingsPage() {
                   Apply
                 </Button>
               </div>
-            </div>
+            </div> */}
           </div>
         </CardContent>
       </Card>
@@ -399,7 +453,7 @@ export default function SettingsPage() {
       </div>
 
       {/* More Transaction Features */}
-      <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
+      {/* <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
         <CardHeader>
           <CardTitle className="text-lg font-semibold">More Transaction Features</CardTitle>
         </CardHeader>
@@ -425,7 +479,7 @@ export default function SettingsPage() {
             ))}
           </div>
         </CardContent>
-      </Card>
+      </Card> */}
 
       {/* Transaction Prefixes */}
       <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
@@ -440,7 +494,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-4">
+              {/* <div className="space-y-4">
                 <h4 className="text-sm font-medium text-gray-700">Prefixes</h4>
                 {[
                   { label: "Sale", value: "None" },
@@ -461,7 +515,7 @@ export default function SettingsPage() {
                     </Select>
                   </div>
                 ))}
-              </div>
+              </div> */}
 
               <div className="space-y-4">
                 <h4 className="text-sm font-medium text-gray-700">&nbsp;</h4>
@@ -886,11 +940,11 @@ Regards,
               { key: "partyGrouping", label: "Party Grouping", checked: partySettings.partyGrouping },
               { key: "shippingAddress", label: "Shipping Address", checked: partySettings.shippingAddress },
               { key: "managePartyStatus", label: "Manage Party Status", checked: partySettings.managePartyStatus },
-              {
-                key: "enablePaymentReminder",
-                label: "Enable Payment Reminder",
-                checked: partySettings.enablePaymentReminder,
-              },
+              // {
+              //   key: "enablePaymentReminder",
+              //   label: "Enable Payment Reminder",
+              //   checked: partySettings.enablePaymentReminder,
+              // },
             ].map((item) => (
               <div key={item.key} className="flex items-center justify-between">
                 <Label className="text-sm font-medium">{item.label}</Label>
@@ -898,7 +952,7 @@ Regards,
               </div>
             ))}
 
-            {partySettings.enablePaymentReminder && (
+            {/* {partySettings.enablePaymentReminder && (
               <div className="flex items-center gap-2 mt-4">
                 <Label className="text-sm font-medium">Remind me for payment due in</Label>
                 <Input
@@ -909,17 +963,17 @@ Regards,
                   min="1"
                 />
                 <span className="text-sm text-gray-500">(days)</span>
-              </div>
-            )}
+              </div> */}
+            {/* )} */}
 
-            <Button variant="link" className="text-blue-600 p-0 h-auto">
+            {/* <Button variant="link" className="text-blue-600 p-0 h-auto">
               Reminder Message &gt;
-            </Button>
+            </Button> */}
           </CardContent>
         </Card>
 
         {/* Additional Fields */}
-        <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
+        {/* <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Additional fields</CardTitle>
           </CardHeader>
@@ -967,10 +1021,10 @@ Regards,
               </div>
             ))}
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* Enable Loyalty Point */}
-        <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
+        {/* <Card className="bg-white/80 backdrop-blur-sm border-gray-200">
           <CardHeader>
             <CardTitle className="text-lg font-semibold">Enable Loyalty Point</CardTitle>
           </CardHeader>
@@ -983,7 +1037,7 @@ Regards,
               />
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
       </div>
     </div>
   )
@@ -1375,8 +1429,8 @@ Regards,
         return renderTransactionSettings()
       case "PRINT":
         return renderPrintSettings()
-      case "TAXES":
-        return renderTaxSettings()
+      // case "TAXES":
+      //   return renderTaxSettings()
       case "TRANSACTION MESSAGE":
         return renderTransactionMessageSettings()
       case "PARTY":
@@ -1498,6 +1552,13 @@ Regards,
           </div>
         </div>
       </div>
+
+      {/* PIN Setup Dialog */}
+      <PINSetupDialog 
+        open={showPINSetup}
+        onOpenChange={setShowPINSetup}
+        onSetupComplete={handlePINSetupComplete}
+      />
     </div>
   )
 }

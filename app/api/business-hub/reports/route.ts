@@ -112,26 +112,36 @@ export async function GET(req: NextRequest) {
 // Helper functions for different report types
 async function getTransactionSummary(phoneNumber: string, startDate?: string | null, endDate?: string | null) {
   try {
-    let query = supabaseServer
+    console.log('📊 Transaction Summary: Fetching data for phone:', phoneNumber);
+    
+    // Fetch sales from user_sales table (direct sales page)
+    let salesQuery = supabaseServer
       .from('user_sales')
       .select('*')
       .eq('phone_number', phoneNumber);
 
     if (startDate) {
-      query = query.gte('invoice_date', startDate);
+      salesQuery = salesQuery.gte('invoice_date', startDate);
     }
     if (endDate) {
-      query = query.lte('invoice_date', endDate);
+      salesQuery = salesQuery.lte('invoice_date', endDate);
     }
 
-    const { data: sales, error: salesError } = await query;
+    // Fetch business transaction sales (business manager/modules)
+    let businessTransactionQuery = supabaseServer
+      .from('user_business_transactions')
+      .select('*')
+      .eq('phone_number', phoneNumber)
+      .eq('type', 'sale');
 
-    if (salesError) {
-      console.error('Error fetching sales for transaction summary:', salesError);
-      return { sales: [], purchases: [], summary: { totalSales: 0, totalPurchases: 0, netProfit: 0 } };
+    if (startDate) {
+      businessTransactionQuery = businessTransactionQuery.gte('timestamp', startDate);
+    }
+    if (endDate) {
+      businessTransactionQuery = businessTransactionQuery.lte('timestamp', endDate);
     }
 
-    // Similarly fetch purchases, cash transactions, etc.
+    // Fetch purchases
     let purchaseQuery = supabaseServer
       .from('user_purchases')
       .select('*')
@@ -144,19 +154,71 @@ async function getTransactionSummary(phoneNumber: string, startDate?: string | n
       purchaseQuery = purchaseQuery.lte('created_at', endDate);
     }
 
-    const { data: purchases, error: purchaseError } = await purchaseQuery;
+    // Execute all queries in parallel
+    const [salesResult, businessTransactionResult, purchasesResult] = await Promise.all([
+      salesQuery,
+      businessTransactionQuery,
+      purchaseQuery
+    ]);
 
-    const totalSales = sales?.reduce((sum, sale) => sum + (sale.total_amount || 0), 0) || 0;
-    const totalPurchases = purchases?.reduce((sum, purchase) => sum + (purchase.total_amount || 0), 0) || 0;
+    if (salesResult.error) {
+      console.error('Error fetching sales for transaction summary:', salesResult.error);
+    }
+
+    if (businessTransactionResult.error) {
+      console.error('Error fetching business transactions for transaction summary:', businessTransactionResult.error);
+    }
+
+    if (purchasesResult.error) {
+      console.error('Error fetching purchases for transaction summary:', purchasesResult.error);
+    }
+
+    const sales = salesResult.data || [];
+    const businessTransactions = businessTransactionResult.data || [];
+    const purchases = purchasesResult.data || [];
+
+    console.log('📊 Transaction Summary: Found', sales.length, 'direct sales,', businessTransactions.length, 'business transaction sales, and', purchases.length, 'purchases');
+
+    // Calculate totals from both sales sources
+    const directSalesTotal = sales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+    const businessTransactionSalesTotal = businessTransactions.reduce((sum, transaction) => sum + (transaction.total_price || 0), 0);
+    const totalSales = directSalesTotal + businessTransactionSalesTotal;
+    
+    const totalPurchases = purchases.reduce((sum, purchase) => sum + (purchase.total_amount || 0), 0);
+
+    // Combine all sales for transaction list (convert business transactions to sales format)
+    const combinedSales = [
+      ...sales,
+      ...businessTransactions.map(transaction => ({
+        id: transaction.id,
+        invoice_number: `BT-${transaction.id}`,
+        total_amount: transaction.total_price || 0,
+        invoice_date: transaction.timestamp?.split('T')[0] || new Date().toISOString().split('T')[0],
+        customer_name: transaction.customer_supplier_name || 'Business Sale',
+        payment_status: transaction.payment_status || 'completed',
+        created_at: transaction.timestamp,
+        source: 'business_manager' // Add source identifier
+      }))
+    ];
+
+    console.log('💰 Transaction Summary: Totals calculated:', {
+      directSalesTotal,
+      businessTransactionSalesTotal,
+      totalSales,
+      totalPurchases,
+      totalTransactions: combinedSales.length + purchases.length
+    });
 
     return {
-      sales: sales || [],
+      sales: combinedSales,
       purchases: purchases || [],
       summary: {
         totalSales,
         totalPurchases,
         netProfit: totalSales - totalPurchases,
-        transactionCount: (sales?.length || 0) + (purchases?.length || 0)
+        transactionCount: combinedSales.length + (purchases?.length || 0),
+        directSalesCount: sales.length,
+        businessManagerSalesCount: businessTransactions.length
       }
     };
   } catch (error) {
@@ -167,30 +229,110 @@ async function getTransactionSummary(phoneNumber: string, startDate?: string | n
 
 async function getSalesReport(phoneNumber: string, startDate?: string | null, endDate?: string | null) {
   try {
-    let query = supabaseServer
+    console.log('📊 Sales Report: Fetching data for phone:', phoneNumber);
+    
+    // Fetch direct sales from user_sales table
+    let salesQuery = supabaseServer
       .from('user_sales')
       .select('*')
       .eq('phone_number', phoneNumber)
       .order('invoice_date', { ascending: false });
 
     if (startDate) {
-      query = query.gte('invoice_date', startDate);
+      salesQuery = salesQuery.gte('invoice_date', startDate);
     }
     if (endDate) {
-      query = query.lte('invoice_date', endDate);
+      salesQuery = salesQuery.lte('invoice_date', endDate);
     }
 
-    const { data, error } = await query;
+    // Fetch business transaction sales (business manager/modules)
+    let businessTransactionQuery = supabaseServer
+      .from('user_business_transactions')
+      .select('*')
+      .eq('phone_number', phoneNumber)
+      .eq('type', 'sale')
+      .order('timestamp', { ascending: false });
 
-    if (error) {
-      console.error('Error fetching sales report:', error);
-      return [];
+    if (startDate) {
+      businessTransactionQuery = businessTransactionQuery.gte('timestamp', startDate);
+    }
+    if (endDate) {
+      businessTransactionQuery = businessTransactionQuery.lte('timestamp', endDate);
     }
 
-    return data || [];
+    // Execute both queries in parallel
+    const [salesResult, businessTransactionResult] = await Promise.all([
+      salesQuery,
+      businessTransactionQuery
+    ]);
+
+    if (salesResult.error) {
+      console.error('Error fetching sales report:', salesResult.error);
+    }
+
+    if (businessTransactionResult.error) {
+      console.error('Error fetching business transaction sales report:', businessTransactionResult.error);
+    }
+
+    const sales = salesResult.data || [];
+    const businessTransactions = businessTransactionResult.data || [];
+
+    console.log('📊 Sales Report: Found', sales.length, 'direct sales and', businessTransactions.length, 'business transaction sales');
+
+    // Combine both sales sources and normalize format
+    const combinedSales = [
+      ...sales.map(sale => ({
+        ...sale,
+        source: 'direct_sales',
+        date: sale.invoice_date,
+        amount: sale.total_amount,
+        customer: sale.customer_name || sale.party_name
+      })),
+      ...businessTransactions.map(transaction => ({
+        id: transaction.id,
+        invoice_number: `BM-${transaction.id}`,
+        total_amount: transaction.total_price || 0,
+        invoice_date: transaction.timestamp?.split('T')[0] || new Date().toISOString().split('T')[0],
+        customer_name: transaction.customer_supplier_name || 'Business Sale',
+        payment_status: transaction.payment_status || 'completed',
+        created_at: transaction.timestamp,
+        source: 'business_manager',
+        date: transaction.timestamp?.split('T')[0],
+        amount: transaction.total_price,
+        customer: transaction.customer_supplier_name,
+        item_name: transaction.item_name,
+        quantity: transaction.quantity
+      }))
+    ];
+
+    // Sort combined sales by date (most recent first)
+    combinedSales.sort((a, b) => {
+      const dateA = new Date(a.date || a.invoice_date || a.created_at || 0);
+      const dateB = new Date(b.date || b.invoice_date || b.created_at || 0);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    // Calculate totals
+    const totalSales = combinedSales.reduce((sum, sale) => sum + (sale.amount || sale.total_amount || 0), 0);
+
+    console.log('💰 Sales Report: Total sales calculated:', totalSales, 'from', combinedSales.length, 'transactions');
+
+    return {
+      sales: combinedSales,
+      totalSales,
+      directSalesCount: sales.length,
+      businessManagerSalesCount: businessTransactions.length,
+      totalCount: combinedSales.length
+    };
   } catch (error) {
     console.error('Error in getSalesReport:', error);
-    return [];
+    return {
+      sales: [],
+      totalSales: 0,
+      directSalesCount: 0,
+      businessManagerSalesCount: 0,
+      totalCount: 0
+    };
   }
 }
 
@@ -327,8 +469,10 @@ async function getProfitLossReport(phoneNumber: string, startDate?: string | nul
       getPurchasesReport(phoneNumber, startDate, endDate)
     ]);
 
-    const totalRevenue = salesData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
-    const totalCosts = purchasesData.reduce((sum, purchase) => sum + (purchase.total_amount || 0), 0);
+    // Handle new salesData format (object with sales array)
+    const salesArray = salesData.sales || [];
+    const totalRevenue = salesArray.reduce((sum: number, sale: any) => sum + (sale.total_amount || sale.amount || 0), 0);
+    const totalCosts = purchasesData.reduce((sum: number, purchase: any) => sum + (purchase.total_amount || 0), 0);
     const grossProfit = totalRevenue - totalCosts;
 
     return {
@@ -674,10 +818,13 @@ async function getBusinessStatusReport(phoneNumber: string, startDate?: string |
     }, 0);
 
     const totalBank = bankData.reduce((sum, account) => sum + (account.balance || 0), 0);
-    const totalSales = salesData.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
-    const totalPurchases = purchasesData.reduce((sum, purchase) => sum + (purchase.total_amount || 0), 0);
-    const totalReceivables = salesData.reduce((sum, sale) => sum + ((sale.total_amount || 0) - (sale.paid_amount || 0)), 0);
-    const totalPayables = purchasesData.reduce((sum, purchase) => sum + ((purchase.total_amount || 0) - (purchase.paid_amount || 0)), 0);
+    
+    // Handle new salesData format (object with sales array)
+    const salesArray = salesData.sales || [];
+    const totalSales = salesArray.reduce((sum: number, sale: any) => sum + (sale.total_amount || sale.amount || 0), 0);
+    const totalPurchases = purchasesData.reduce((sum: number, purchase: any) => sum + (purchase.total_amount || 0), 0);
+    const totalReceivables = salesArray.reduce((sum: number, sale: any) => sum + ((sale.total_amount || sale.amount || 0) - (sale.paid_amount || 0)), 0);
+    const totalPayables = purchasesData.reduce((sum: number, purchase: any) => sum + ((purchase.total_amount || 0) - (purchase.paid_amount || 0)), 0);
 
     return {
       assets: {
@@ -724,8 +871,8 @@ async function getTaxReport(phoneNumber: string, startDate?: string | null, endD
       getCashTransactionsData(phoneNumber, startDate, endDate)
     ]);
 
-    // Calculate tax from sales
-    const salesTax = salesData.reduce((sum, sale) => {
+    // Calculate tax from sales - handle new object format
+    const salesTax = salesData.sales.reduce((sum, sale) => {
       if (sale.items) {
         const items = typeof sale.items === 'string' ? JSON.parse(sale.items) : sale.items;
         return sum + items.reduce((itemSum: number, item: any) => {
@@ -762,7 +909,7 @@ async function getTaxReport(phoneNumber: string, startDate?: string | null, endD
       totalTax: salesTax + purchasesTax + cashTax,
       netTax: salesTax - purchasesTax + cashTax,
       breakdown: {
-        sales: salesData.map(sale => ({
+        sales: salesData.sales.map(sale => ({
           ...sale,
           taxAmount: sale.items ? 
             (typeof sale.items === 'string' ? JSON.parse(sale.items) : sale.items).reduce((sum: number, item: any) => {

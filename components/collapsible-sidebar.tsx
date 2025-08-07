@@ -22,6 +22,7 @@ import {
   TrendingUp,
   ChevronDown,
   BarChart3,
+  ExternalLink,
 } from "lucide-react"
 
 interface SidebarProps {
@@ -49,7 +50,7 @@ const sidebarNavigation = useMemo(() => [
   { name: "Sync, Share & Backup", icon: Cloud, tab: "sync", hasDropdown: true, href: "/business-hub/sync" },
   { name: "Utilities", icon: Zap, tab: "utilities", hasDropdown: true, href: "/business-hub/utilities" },
   { name: "Settings", icon: Settings, tab: "settings", href: "/business-hub/settings" },
-  { name: "Plans & Pricing", icon: DollarSign, tab: "plans", href: "/business-hub/plans" },
+  { name: "Plans", icon: DollarSign, tab: "plans", href: "/business-hub/price" },
 ], [])
 
 
@@ -202,7 +203,7 @@ const sidebarNavigation = useMemo(() => [
         </nav>
 
         {/* Promotional Banner */}
-        <div className={`p-4 transition-all duration-300 ${isHovered ? "opacity-100" : "opacity-0"}`}>
+        {/* <div className={`p-4 transition-all duration-300 ${isHovered ? "opacity-100" : "opacity-0"}`}>
           {isHovered && (
             <div className="bg-gradient-to-r from-red-600 via-red-500 to-pink-600 rounded-xl p-4 text-white relative overflow-hidden shadow-lg">
               <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-10 translate-x-10"></div>
@@ -217,25 +218,29 @@ const sidebarNavigation = useMemo(() => [
                 <div className="text-lg font-bold mb-2">OFFER</div>
                 <div className="text-xs mb-2 opacity-90">📅 9 Jul 2025</div>
                 <div className="text-xs mb-3 opacity-90">🕐 4:32 PM - 3:32 PM</div>
-                <Button className="bg-yellow-400 hover:bg-yellow-500 text-black text-xs px-3 py-1 h-auto font-bold shadow-md hover:shadow-lg transition-all">
+                <Button 
+                  onClick={() => window.open('https://craftcrm.tech/pricing', '_blank')}
+                  className="bg-yellow-400 hover:bg-yellow-500 text-black text-xs px-3 py-1 h-auto font-bold shadow-md hover:shadow-lg transition-all flex items-center gap-1"
+                >
                   Buy Now
+                  <ExternalLink className="h-3 w-3" />
                 </Button>
               </div>
             </div>
           )}
-        </div>
+        </div> */}
 
         {/* Bottom CRM Link */}
-        <div
+        {/* <div
           className={`p-4 border-t border-slate-700/50 transition-all duration-300 ${isHovered ? "opacity-100" : "opacity-0"}`}
-        >
-          <Link href="/crm" className="block">
+        > */}
+          {/* <Link href="/crm" className="block">
             <button className="w-full flex items-center justify-between text-slate-300 hover:text-white transition-colors group">
               <span className="text-sm font-medium">Craft CRM</span>
               <ChevronRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </button>
-          </Link>
-        </div>
+          </Link> */}
+        {/* </div> */}
       </div>
 
       {/* Sidebar Overlay for Mobile */}

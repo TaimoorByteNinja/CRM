@@ -106,6 +106,11 @@ export default function OverviewPage() {
     totalProfit: 0,
     totalCount: 0
   })
+  
+  // Real transactions data state
+  const [realTransactions, setRealTransactions] = useState<any[]>([])
+  const [transactionsLoading, setTransactionsLoading] = useState(true)
+  
   const selectedPeriod = useAppSelector((state) => state.dashboard.selectedPeriod)
   const lastUpdated = useAppSelector((state) => state.dashboard.lastUpdated)
   const dashboardLoading = useAppSelector((state) => state.dashboard.loading)
@@ -199,16 +204,17 @@ export default function OverviewPage() {
 
       dispatch(setLoading(true))
       try {
+        console.log('📊 Overview: Fetching data for phone:', generalSettings.phoneNumber)
         // Fetch real-time overview metrics using the API client
         const result = await apiClient.overview.getMetrics(generalSettings.phoneNumber)
         
         if (result.success) {
-          console.log('Real-time metrics fetched:', result.data)
+          console.log('✅ Overview: Real-time metrics fetched successfully:', result.data)
           setRealTimeMetrics(result.data)
           // Update the last updated timestamp
           dispatch(setLastUpdated(new Date().toISOString()))
         } else {
-          console.error('Failed to fetch real-time metrics:', result.error)
+          console.error('❌ Overview: Failed to fetch real-time metrics:', result.error)
         }
 
         // Generate sample notifications on first load (for demonstration)
@@ -275,10 +281,10 @@ export default function OverviewPage() {
     const fetchAnalyticsData = async () => {
       setAnalyticsLoading(true)
       try {
-        console.log('Fetching analytics data for period:', selectedPeriod)
+        console.log('📈 Analytics: Fetching data for period:', selectedPeriod, 'phone:', generalSettings.phoneNumber)
         // Fetch sales chart data
         const salesResponse = await apiClient.analytics.getSalesChart(selectedPeriod)
-        console.log('Sales response:', salesResponse)
+        console.log('📊 Analytics: Sales response:', salesResponse)
         setSalesChartData(salesResponse.data || [])
         setAnalyticsTotals({
           totalSales: salesResponse.totalSales || 0,
@@ -289,10 +295,10 @@ export default function OverviewPage() {
 
         // Fetch category analytics
         const categoryResponse = await apiClient.analytics.getCategoryAnalytics()
-        console.log('Category response:', categoryResponse)
+        console.log('🏷️ Analytics: Category response:', categoryResponse)
         setCategoryData(categoryResponse.categories || [])
       } catch (error) {
-        console.error('Failed to fetch analytics data:', error)
+        console.error('❌ Analytics: Failed to fetch analytics data:', error)
       } finally {
         setAnalyticsLoading(false)
       }
@@ -300,6 +306,28 @@ export default function OverviewPage() {
 
     fetchAnalyticsData()
   }, [selectedPeriod])
+
+  // Fetch recent transactions
+  useEffect(() => {
+    const fetchRecentTransactions = async () => {
+      setTransactionsLoading(true)
+      try {
+        console.log('🔄 Recent Transactions: Fetching for phone:', generalSettings.phoneNumber)
+        const response = await apiClient.recentTransactions.getRecent(5)
+        console.log('✅ Recent Transactions: Response:', response)
+        setRealTransactions(response.data || [])
+      } catch (error) {
+        console.error('❌ Recent Transactions: Failed to fetch:', error)
+        setRealTransactions([])
+      } finally {
+        setTransactionsLoading(false)
+      }
+    }
+
+    if (generalSettings.phoneNumber) {
+      fetchRecentTransactions()
+    }
+  }, [generalSettings.phoneNumber])
 
   // Target achievement detection
   useEffect(() => {
@@ -471,17 +499,46 @@ export default function OverviewPage() {
     setMonthlyTarget(newMonthlyTarget)
   }
 
-  // Transform recent activity for display
-  const recentTransactions = recentActivity.slice(0, 4).map((activity, index) => ({
-    id: index + 1,
-    type: activity.type === 'sale' ? 'Sale' : 'Purchase',
-    party: activity.type === 'sale' 
-      ? activity.description.split(' - ')[0] 
-      : activity.description.split(' - ')[0],
-    amount: activity.amount,
-    status: activity.status === 'paid' ? 'Paid' : 'Pending',
-    time: new Date(activity.date || Date.now()).toLocaleDateString(),
-  }))
+  // Use real transactions instead of mock data
+  const recentTransactions = realTransactions.slice(0, 4)
+
+  // Refresh functions for dialogs
+  const refreshOverviewData = async () => {
+    console.log('🔄 Refreshing overview data after transaction...')
+    
+    // Refresh recent transactions
+    try {
+      const response = await apiClient.recentTransactions.getRecent(5)
+      setRealTransactions(response.data || [])
+    } catch (error) {
+      console.error('❌ Failed to refresh transactions:', error)
+    }
+    
+    // Refresh real-time metrics
+    try {
+      const result = await apiClient.overview.getMetrics(generalSettings.phoneNumber)
+      if (result.success) {
+        setRealTimeMetrics(result.data)
+        dispatch(setLastUpdated(new Date().toISOString()))
+      }
+    } catch (error) {
+      console.error('❌ Failed to refresh metrics:', error)
+    }
+    
+    // Refresh analytics data
+    try {
+      const salesResponse = await apiClient.analytics.getSalesChart(selectedPeriod)
+      setSalesChartData(salesResponse.data || [])
+      setAnalyticsTotals({
+        totalSales: salesResponse.totalSales || 0,
+        totalRevenue: salesResponse.totalRevenue || 0,
+        totalProfit: salesResponse.totalProfit || 0,
+        totalCount: salesResponse.totalCount || 0
+      })
+    } catch (error) {
+      console.error('❌ Failed to refresh analytics:', error)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background-secondary">
@@ -491,7 +548,7 @@ export default function OverviewPage() {
       {/* Main Content */}
       <div className="ml-16 flex flex-col min-h-screen">
         {/* Enhanced Header */}
-        <div className="bg-background-primary border-b border-border-default shadow-lg sticky top-0 z-30">
+        <div className="bg-white border-b border-gray-200 shadow-lg sticky top-0 z-30">
           <div className="px-8 py-6">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-8">
@@ -1013,19 +1070,19 @@ export default function OverviewPage() {
                   <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
                     <div className="text-sm text-blue-600 mb-1">Total Sales ({selectedPeriod})</div>
                     <div className="text-2xl font-bold text-blue-800">
-                      ₹{analyticsTotals.totalSales.toLocaleString('en-IN')}
+                      {formatAmountWithSymbol(analyticsTotals.totalSales)}
                     </div>
                   </div>
                   <div className="bg-green-50 p-4 rounded-lg border border-green-100">
                     <div className="text-sm text-green-600 mb-1">Total Revenue ({selectedPeriod})</div>
                     <div className="text-2xl font-bold text-green-800">
-                      ₹{analyticsTotals.totalRevenue.toLocaleString('en-IN')}
+                      {formatAmountWithSymbol(analyticsTotals.totalRevenue)}
                     </div>
                   </div>
                   <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
                     <div className="text-sm text-purple-600 mb-1">Total Profit ({selectedPeriod})</div>
                     <div className="text-2xl font-bold text-purple-800">
-                      ₹{analyticsTotals.totalProfit.toLocaleString('en-IN')}
+                      {formatAmountWithSymbol(analyticsTotals.totalProfit)}
                     </div>
                   </div>
                   <div className="bg-orange-50 p-4 rounded-lg border border-orange-100">
@@ -1060,7 +1117,7 @@ export default function OverviewPage() {
                           stroke="#6B7280" 
                           fontSize={12}
                           tick={{ fontSize: 12 }}
-                          tickFormatter={(value) => `₹${value.toLocaleString('en-IN')}`}
+                          tickFormatter={(value) => formatAmountWithSymbol(value)}
                           domain={['dataMin - 1000', 'dataMax + 1000']}
                         />
                         <Tooltip
@@ -1071,7 +1128,7 @@ export default function OverviewPage() {
                             boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
                           }}
                           formatter={(value: any, name: any) => {
-                            const formattedValue = `₹${Number(value).toLocaleString('en-IN')}`;
+                            const formattedValue = formatAmountWithSymbol(Number(value));
                             const label = name === 'sales' ? 'Sales' : 
                                          name === 'profit' ? 'Profit' : 
                                          name === 'revenue' ? 'Revenue' : name;
@@ -1116,7 +1173,7 @@ export default function OverviewPage() {
             )}
 
             {/* Recent Transactions */}
-            {dashboardLoading ? (
+            {transactionsLoading ? (
               <LoadingState 
                 type="table" 
                 text="Loading recent transactions..." 
@@ -1141,7 +1198,15 @@ export default function OverviewPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {recentTransactions.map((transaction) => (
+                  {recentTransactions.length === 0 ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center text-gray-500">
+                        <div className="mb-2">No recent transactions</div>
+                        <div className="text-sm">Start by creating your first sale or purchase</div>
+                      </div>
+                    </div>
+                  ) : (
+                    recentTransactions.map((transaction) => (
                     <div
                       key={transaction.id}
                       className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-all duration-200 group"
@@ -1167,7 +1232,10 @@ export default function OverviewPage() {
                         <div>
                           <p className="font-semibold text-gray-900">{transaction.party}</p>
                           <p className="text-sm text-gray-600">
-                            {transaction.type} • {transaction.time}
+                            {transaction.type}
+                            {transaction.item && ` • ${transaction.item}`}
+                            {transaction.quantity && ` (${transaction.quantity}x)`}
+                            {` • ${transaction.time}`}
                           </p>
                         </div>
                       </div>
@@ -1194,7 +1262,8 @@ export default function OverviewPage() {
                         </Button>
                       </div>
                     </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -1527,8 +1596,18 @@ export default function OverviewPage() {
             )}
           </div>
         </div>
-        <NewSaleDialog open={showSaleDialog} onOpenChange={setShowSaleDialog} trigger={null} />
-        <AdvancedPurchaseDialog open={showPurchaseDialog} onOpenChange={setShowPurchaseDialog} purchaseToEdit={selectedPurchase} />
+        <NewSaleDialog 
+          open={showSaleDialog} 
+          onOpenChange={setShowSaleDialog} 
+          trigger={null} 
+          onSave={refreshOverviewData}
+        />
+        <AdvancedPurchaseDialog 
+          open={showPurchaseDialog} 
+          onOpenChange={setShowPurchaseDialog} 
+          purchaseToEdit={selectedPurchase}
+          onSave={refreshOverviewData}
+        />
         <NewCustomerDialog open={showCustomerDialog} onOpenChange={setShowCustomerDialog} trigger={null} />
         <NewItemDialog open={showItemDialog} onOpenChange={setShowItemDialog} trigger={null} />
         <TargetSettingsDialog 
@@ -1540,13 +1619,6 @@ export default function OverviewPage() {
           currentMonthlySales={realTimeMetrics?.totalSales || 0}
           onTargetsUpdate={handleTargetsUpdate}
         />
-
-        {/* Temporary: User Data Isolation Test Component */}
-        {process.env.NODE_ENV === 'development' && showUserDataTest && (
-          <div className="fixed bottom-4 right-4 z-50">
-            <UserDataTest onClose={() => setShowUserDataTest(false)} />
-          </div>
-        )}
       </div>
     </div>
   )

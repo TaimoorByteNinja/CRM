@@ -2,6 +2,9 @@
 
 import type React from "react"
 import { useState, useRef, useCallback, useEffect } from "react"
+import { useAppSelector } from "@/lib/store/hooks"
+import JsBarcode from 'jsbarcode'
+import QRCode from 'qrcode'
 
 import type { FunctionComponent } from "react"
 
@@ -52,8 +55,6 @@ import {
   FileX,
 } from "lucide-react"
 import LoadingSpinner from "@/components/LoadingSpinner"
-import JsBarcode from "jsbarcode"
-import QRCode from "qrcode"
 
 // Currency formatting function
 const formatCurrency = (amount: number | null | undefined): string => {
@@ -142,6 +143,10 @@ interface BulkUpdateItem {
 const UtilitiesPage: FunctionComponent = () => {
   const [activeTab, setActiveTab] = useState("utilities")
   const [selectedUtility, setSelectedUtility] = useState("import-items")
+  
+  // Get phone number from Redux store
+  const phoneNumber = useAppSelector((state) => state.settings.general.phoneNumber)
+  
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
@@ -241,9 +246,14 @@ const UtilitiesPage: FunctionComponent = () => {
 
   // Function to fetch items from backend
   const fetchItemsFromBackend = async () => {
+    if (!phoneNumber) {
+      console.error('No phone number available for API call')
+      return
+    }
+    
     setIsLoadingItems(true)
     try {
-      const response = await fetch('/api/business-hub/items')
+      const response = await fetch(`/api/business-hub/items?phone=${encodeURIComponent(phoneNumber)}`)
       if (!response.ok) {
         throw new Error('Failed to fetch items')
       }
@@ -282,9 +292,14 @@ const UtilitiesPage: FunctionComponent = () => {
 
   // Function to fetch items specifically for barcode generator
   const fetchItemsForBarcodeGenerator = async () => {
+    if (!phoneNumber) {
+      console.error('No phone number available for API call')
+      return
+    }
+    
     setIsLoadingBarcodeItems(true)
     try {
-      const response = await fetch('/api/business-hub/items')
+      const response = await fetch(`/api/business-hub/items?phone=${encodeURIComponent(phoneNumber)}`)
       if (!response.ok) {
         throw new Error('Failed to fetch items')
       }
@@ -599,6 +614,12 @@ const UtilitiesPage: FunctionComponent = () => {
   }, [handlePartiesFileUpload])
 
   const savePartiesToBackend = async () => {
+    if (!phoneNumber) {
+      console.error('No phone number available for API call')
+      alert('Phone number is required to save parties.')
+      return
+    }
+    
     setIsImportingParties(true)
     try {
       const savePromises = importParties.map(async (party) => {
@@ -608,9 +629,10 @@ const UtilitiesPage: FunctionComponent = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            phone: phoneNumber,
             name: party.name,
             type: party.type,
-            phone: party.contact || party.phone,
+            party_phone: party.contact || party.phone,
             email: party.email,
             address: party.address,
             city: party.city,
@@ -782,6 +804,12 @@ const UtilitiesPage: FunctionComponent = () => {
   )
 
   const saveItemsToBackend = async () => {
+    if (!phoneNumber) {
+      console.error('No phone number available for API call')
+      alert('Phone number is required to save items.')
+      return
+    }
+    
     setIsImportingItems(true)
     try {
       const savePromises = importItems.map(async (item) => {
@@ -791,12 +819,20 @@ const UtilitiesPage: FunctionComponent = () => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            phone: phoneNumber,
             name: item.itemName,
+            item_name: item.itemName,
             hsn: item.hsn,
+            hsn_code: item.hsn,
             price: item.salePrice,
+            sale_price: item.salePrice,
             cost: item.purchasePrice,
+            purchase_price: item.purchasePrice,
             quantity: item.openingStock,
+            stock: item.openingStock,
+            stock_quantity: item.openingStock,
             min_stock: item.minimumStock,
+            minimum_stock: item.minimumStock,
             location: item.godown,
             gst_rate: item.gstRate,
             taxable: item.taxable === 'Y',
@@ -1118,23 +1154,28 @@ const UtilitiesPage: FunctionComponent = () => {
 
   // Fetch real data for export
   const fetchExportData = async () => {
+    if (!phoneNumber) {
+      console.error('No phone number available for API call')
+      return null
+    }
+    
     setIsExportingToTally(true)
     setExportProgress(0)
     
     try {
       // Fetch items
       setExportProgress(20)
-      const itemsResponse = await fetch('/api/business-hub/items')
+      const itemsResponse = await fetch(`/api/business-hub/items?phone=${encodeURIComponent(phoneNumber)}`)
       const itemsData = await itemsResponse.ok ? await itemsResponse.json() : []
       
       // Fetch parties
       setExportProgress(40)
-      const partiesResponse = await fetch('/api/business-hub/parties')
+      const partiesResponse = await fetch(`/api/business-hub/parties?phone=${encodeURIComponent(phoneNumber)}`)
       const partiesData = await partiesResponse.ok ? await partiesResponse.json() : []
       
       // Fetch sales
       setExportProgress(60)
-      const salesResponse = await fetch('/api/business-hub/sales')
+      const salesResponse = await fetch(`/api/business-hub/sales?phone=${encodeURIComponent(phoneNumber)}`)
       const salesData = await salesResponse.ok ? await salesResponse.json() : []
       
       setExportProgress(80)
@@ -1362,12 +1403,17 @@ const UtilitiesPage: FunctionComponent = () => {
 
   // Fetch items for export
   const fetchItemsForExport = async () => {
+    if (!phoneNumber) {
+      console.error('No phone number available for API call')
+      return []
+    }
+    
     setIsExportingItems(true)
     setExportItemsProgress(0)
     
     try {
       setExportItemsProgress(30)
-      const response = await fetch('/api/business-hub/items')
+      const response = await fetch(`/api/business-hub/items?phone=${encodeURIComponent(phoneNumber)}`)
       if (!response.ok) {
         throw new Error('Failed to fetch items')
       }
@@ -1596,6 +1642,16 @@ const UtilitiesPage: FunctionComponent = () => {
     return date.toLocaleDateString()
   }
 
+  // Helper function to format currency
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    }).format(amount)
+  }
+
   // Render utility content
   const renderUtilityContent = () => {
     switch (selectedUtility) {
@@ -1618,12 +1674,12 @@ const UtilitiesPage: FunctionComponent = () => {
                     </Button>
 
                     {/* Sample table preview */}
-                    <div className="overflow-x-auto">
-                      <img
-                        src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-08S8rxqURC0YD8VrWB3OnPR0kvoYAg.png"
-                        alt="Sample Excel format"
-                        className="w-full max-w-md border rounded-lg"
-                      />
+                    <div className="overflow-x-auto bg-gray-50 p-4 rounded-lg border">
+                      <div className="text-sm text-gray-600 mb-2 font-medium">Sample Excel Format:</div>
+                      <div className="text-xs text-gray-500 space-y-1">
+                        <div>Column Headers: itemName, hsn, salePrice, purchasePrice, openingStock, minimumStock, godown, gstRate, taxable</div>
+                        <div>Example Row: "Sample Item", "H001", 150, 100, 50, 10, "Main Store", "GST@18%", "Y"</div>
+                      </div>
                     </div>
                   </div>
 

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Craft CRM Icon Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        canvas {
+            border: 1px solid #ccc;
+            margin: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Craft CRM Icon Generator</h1>
+    <p>Right-click the canvas and "Save image as" to get your PNG icon</p>
+    
+    <canvas id="iconCanvas" width="256" height="256"></canvas>
+    
+    <script>
+        const canvas = document.getElementById('iconCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Set high DPI for crisp rendering
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = 256 * dpr;
+        canvas.height = 256 * dpr;
+        canvas.style.width = '256px';
+        canvas.style.height = '256px';
+        ctx.scale(dpr, dpr);
+        
+        // Draw blue rounded rectangle background
+        ctx.fillStyle = '#2563eb';
+        ctx.beginPath();
+        ctx.roundRect(0, 0, 256, 256, 45);
+        ctx.fill();
+        
+        // Draw white rotated square in center
+        ctx.save();
+        ctx.translate(128, 128); // Move to center
+        ctx.rotate(12 * Math.PI / 180); // Rotate 12 degrees
+        
+        ctx.strokeStyle = 'white';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.roundRect(-40, -40, 80, 80, 8);
+        ctx.stroke();
+        
+        ctx.restore();
+        
+        console.log('Icon generated! Right-click the canvas to save as PNG');
+    </script>
+</body>
+</html>

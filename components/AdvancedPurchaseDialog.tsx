@@ -17,9 +17,10 @@ interface AdvancedPurchaseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   purchaseToEdit?: any // can be improved with a type
+  onSave?: () => void
 }
 
-export default function AdvancedPurchaseDialog({ open, onOpenChange, purchaseToEdit }: AdvancedPurchaseDialogProps) {
+export default function AdvancedPurchaseDialog({ open, onOpenChange, purchaseToEdit, onSave }: AdvancedPurchaseDialogProps) {
   const dispatch = useAppDispatch()
   const purchases = useAppSelector(selectAllPurchases)
   const parties = useAppSelector(selectAllParties)
@@ -140,6 +141,11 @@ export default function AdvancedPurchaseDialog({ open, onOpenChange, purchaseToE
         }
       }
       onOpenChange(false);
+      
+      // Call onSave callback to refresh data
+      if (onSave) {
+        onSave();
+      }
     } catch (error) {
       dispatch(showNotification({ message: "Failed to save purchase", type: "error" }));
     } finally {

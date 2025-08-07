@@ -3,12 +3,16 @@ const path = require('path');
 const http = require('http');
 const isDev = !app.isPackaged;
 
+// Set app name
+app.setName('Craft CRM');
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 1200,
     minHeight: 800,
+    title: 'Craft CRM',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -18,7 +22,7 @@ function createWindow() {
       allowRunningInsecureContent: false, // Prevent insecure content
       experimentalFeatures: false // Disable experimental features
     },
-    icon: path.join(__dirname, '../public/business-hub-icon.png'), // Add your app icon
+    icon: path.join(__dirname, '../assets/craft-crm-icon.png'), // Updated icon path
     show: false, // Don't show until ready
   });
 

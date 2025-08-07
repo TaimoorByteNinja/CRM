@@ -58,36 +58,146 @@ export async function GET(req: NextRequest) {
         break;
     }
 
-    // Build query for user-specific sales data
-    let query = supabase
+    // Build queries for user-specific sales data from both tables
+    console.log('📊 Analytics: Fetching sales data from both tables for phone:', phoneNumber);
+
+    // Query 1: Business transactions (business manager sales)
+    let businessTransactionQuery = supabase
+      .from('user_business_transactions')
+      .select('timestamp, total_price, type')
+      .eq('phone_number', phoneNumber)
+      .eq('type', 'sale')
+      .order('timestamp', { ascending: true });
+
+    if (startDate && endDate) {
+      businessTransactionQuery = businessTransactionQuery.gte('timestamp', startDate).lte('timestamp', endDate);
+    }
+
+    // Query 2: Direct sales (sales page sales)
+    let userSalesQuery = supabase
       .from('user_sales')
-      .select('created_at, total_amount, subtotal, tax_amount')
+      .select('created_at, total_amount')
       .eq('phone_number', phoneNumber)
       .order('created_at', { ascending: true });
 
     if (startDate && endDate) {
-      query = query.gte('created_at', startDate).lte('created_at', endDate);
+      userSalesQuery = userSalesQuery.gte('created_at', startDate).lte('created_at', endDate);
     }
 
-    const { data: sales, error } = await query;
+    // Execute both queries in parallel, plus get purchases and expenses for accurate profit calculation
+    const [businessTransactionResult, userSalesResult, purchasesResult, expensesResult] = await Promise.all([
+      businessTransactionQuery,
+      userSalesQuery,
+      // Get purchases for profit calculation (same as overview page)
+      supabase
+        .from('user_purchases')
+        .select('purchase_date, total_amount, created_at')
+        .eq('phone_number', phoneNumber)
+        .then(result => {
+          if (startDate && endDate) {
+            // Filter purchases by date range
+            const filtered = (result.data || []).filter(purchase => {
+              const purchaseDate = new Date(purchase.purchase_date || purchase.created_at).toISOString().split('T')[0];
+              return purchaseDate >= startDate && purchaseDate <= endDate;
+            });
+            return { ...result, data: filtered };
+          }
+          return result;
+        }),
+      // Get expenses for profit calculation (same as overview page)
+      supabase
+        .from('user_expenses')
+        .select('expense_date, amount, created_at')
+        .eq('phone_number', phoneNumber)
+        .then(result => {
+          if (startDate && endDate) {
+            // Filter expenses by date range
+            const filtered = (result.data || []).filter(expense => {
+              const expenseDate = new Date(expense.expense_date || expense.created_at).toISOString().split('T')[0];
+              return expenseDate >= startDate && expenseDate <= endDate;
+            });
+            return { ...result, data: filtered };
+          }
+          return result;
+        })
+    ]);
 
-    if (error) {
-      console.error('Error fetching sales chart data:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    if (businessTransactionResult.error) {
+      console.error('Error fetching business transaction sales:', businessTransactionResult.error);
+      return NextResponse.json({ error: businessTransactionResult.error.message }, { status: 500 });
     }
 
-    // Group data by date
+    if (userSalesResult.error) {
+      console.error('Error fetching user sales:', userSalesResult.error);
+      return NextResponse.json({ error: userSalesResult.error.message }, { status: 500 });
+    }
+
+    if (purchasesResult.error) {
+      console.error('Error fetching purchases:', purchasesResult.error);
+      // Continue without purchases data
+    }
+
+    if (expensesResult.error) {
+      console.error('Error fetching expenses:', expensesResult.error);
+      // Continue without expenses data
+    }
+
+    const businessTransactionSales = businessTransactionResult.data || [];
+    const userSales = userSalesResult.data || [];
+    const purchases = purchasesResult.data || [];
+    const expenses = expensesResult.data || [];
+
+    console.log('📈 Analytics: Found', businessTransactionSales.length, 'business transaction sales,', userSales.length, 'user sales,', purchases.length, 'purchases, and', expenses.length, 'expenses');
+
+    // Group purchases and expenses by date for accurate profit calculation
+    const purchasesByDate: { [key: string]: number } = {};
+    const expensesByDate: { [key: string]: number } = {};
+
+    purchases.forEach(purchase => {
+      const date = new Date(purchase.purchase_date || purchase.created_at).toISOString().split('T')[0];
+      purchasesByDate[date] = (purchasesByDate[date] || 0) + (purchase.total_amount || 0);
+    });
+
+    expenses.forEach(expense => {
+      const date = new Date(expense.expense_date || expense.created_at).toISOString().split('T')[0];
+      expensesByDate[date] = (expensesByDate[date] || 0) + (expense.amount || 0);
+    });
+
+    // Group data by date, combining both sources (same logic as overview page)
     const groupedData: { [key: string]: { sales: number; revenue: number; profit: number; count: number } } = {};
 
-    sales?.forEach(sale => {
+    // Process business transaction sales
+    businessTransactionSales.forEach(sale => {
+      const date = new Date(sale.timestamp).toISOString().split('T')[0];
+      if (!groupedData[date]) {
+        groupedData[date] = { sales: 0, revenue: 0, profit: 0, count: 0 };
+      }
+      const totalPrice = sale.total_price || 0;
+      groupedData[date].sales += totalPrice;
+      groupedData[date].count += 1;
+    });
+
+    // Process user sales
+    userSales.forEach(sale => {
       const date = new Date(sale.created_at).toISOString().split('T')[0];
       if (!groupedData[date]) {
         groupedData[date] = { sales: 0, revenue: 0, profit: 0, count: 0 };
       }
-      groupedData[date].sales += sale.total_amount || 0;
-      groupedData[date].revenue += sale.subtotal || 0;
-      groupedData[date].profit += (sale.subtotal || 0) * 0.25; // Assuming 25% profit margin
+      const totalAmount = sale.total_amount || 0;
+      groupedData[date].sales += totalAmount;
       groupedData[date].count += 1;
+    });
+
+    // Calculate revenue and profit using the same logic as overview page
+    Object.keys(groupedData).forEach(date => {
+      const dayData = groupedData[date];
+      // Revenue = Sales (same as overview page)
+      dayData.revenue = dayData.sales;
+      
+      // Profit = Sales - Purchases - Expenses (same as overview page)
+      const dayPurchases = purchasesByDate[date] || 0;
+      const dayExpenses = expensesByDate[date] || 0;
+      dayData.profit = Math.max(0, dayData.sales - dayPurchases - dayExpenses);
     });
 
     // Convert to array format for charts
@@ -161,13 +271,48 @@ export async function GET(req: NextRequest) {
       finalChartData = filledData;
     }
 
+    // Calculate overall totals for verification (same as overview API)
+    const overallSales = businessTransactionSales.reduce((sum, sale) => sum + (sale.total_price || 0), 0) + 
+                        userSales.reduce((sum, sale) => sum + (sale.total_amount || 0), 0);
+    const overallPurchases = purchases.reduce((sum, purchase) => sum + (purchase.total_amount || 0), 0);
+    const overallExpenses = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
+    const overallProfit = Math.max(0, overallSales - overallPurchases - overallExpenses);
+
+    console.log('📊 Analytics: Overall calculations:', {
+      overallSales,
+      overallPurchases, 
+      overallExpenses,
+      overallProfit,
+      chartDataTotalSales: finalChartData.reduce((sum, item) => sum + item.sales, 0),
+      chartDataTotalProfit: finalChartData.reduce((sum, item) => sum + item.profit, 0)
+    });
+
     return NextResponse.json({
       period,
       data: finalChartData,
-      totalSales: finalChartData.reduce((sum, item) => sum + item.sales, 0),
-      totalRevenue: finalChartData.reduce((sum, item) => sum + item.revenue, 0),
-      totalProfit: finalChartData.reduce((sum, item) => sum + item.profit, 0),
+      // Use the same overall calculation method as overview API for consistency
+      totalSales: overallSales,
+      totalRevenue: overallSales, // Revenue = Sales (same as overview)
+      totalProfit: overallProfit, // Profit = Sales - Purchases - Expenses (same as overview)
       totalCount: finalChartData.reduce((sum, item) => sum + item.count, 0),
+      // Add totals calculated the same way as overview API for verification
+      overallTotals: {
+        totalSalesFromData: overallSales,
+        totalPurchasesFromData: overallPurchases,
+        totalExpensesFromData: overallExpenses,
+        calculatedProfit: overallProfit
+      },
+      debug: {
+        rawDataCount: businessTransactionSales.length + userSales.length,
+        businessTransactionCount: businessTransactionSales.length,
+        userSalesCount: userSales.length,
+        purchasesCount: purchases.length,
+        expensesCount: expenses.length,
+        groupedDataKeys: Object.keys(groupedData),
+        sampleData: finalChartData.slice(0, 2),
+        purchasesByDate: Object.keys(purchasesByDate).length > 0 ? purchasesByDate : 'No purchases found',
+        expensesByDate: Object.keys(expensesByDate).length > 0 ? expensesByDate : 'No expenses found'
+      }
     });
 
   } catch (error) {

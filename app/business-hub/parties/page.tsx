@@ -358,14 +358,14 @@ export default function PartiesPage() {
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <Button className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
+                {/* <Button className="bg-gradient-to-r from-red-500 to-pink-600 hover:from-red-600 hover:to-pink-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Sale
                 </Button>
                 <Button className="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-6 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105">
                   <Plus className="h-4 w-4 mr-2" />
                   Add Purchase
-                </Button>
+                </Button> */}
                 <Button
                   variant="outline"
                   size="sm"

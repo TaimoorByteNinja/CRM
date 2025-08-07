@@ -1,0 +1,90 @@
+<!-- This is a placeholder. You'll need to convert the SVG to PNG/ICO format -->
+<!-- For now, I'll create a simple HTML file that renders your logo for easy conversion -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Craft CRM Logo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f0f0;
+            font-family: Arial, sans-serif;
+        }
+        .logo {
+            width: 256px;
+            height: 256px;
+            background: #2563eb;
+            border-radius: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 20px;
+            box-shadow: 0 8px 32px rgba(37, 99, 235, 0.3);
+        }
+        .inner-box {
+            width: 80px;
+            height: 80px;
+            border: 8px solid white;
+            border-radius: 8px;
+            transform: rotate(12deg);
+        }
+        .sizes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .size-16 { width: 16px; height: 16px; border-radius: 3px; }
+        .size-32 { width: 32px; height: 32px; border-radius: 6px; }
+        .size-64 { width: 64px; height: 64px; border-radius: 12px; }
+        .size-128 { width: 128px; height: 128px; border-radius: 22px; }
+        .size-256 { width: 256px; height: 256px; border-radius: 45px; }
+        
+        .size-16 .inner-box { width: 4px; height: 4px; border-width: 1px; border-radius: 1px; }
+        .size-32 .inner-box { width: 8px; height: 8px; border-width: 2px; border-radius: 1px; }
+        .size-64 .inner-box { width: 16px; height: 16px; border-width: 3px; border-radius: 2px; }
+        .size-128 .inner-box { width: 32px; height: 32px; border-width: 4px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>Craft CRM Logo - Multiple Sizes</h1>
+    <p>Right-click each logo to save as PNG for icon conversion</p>
+    
+    <div class="sizes">
+        <div>
+            <h3>16x16</h3>
+            <div class="logo size-16">
+                <div class="inner-box"></div>
+            </div>
+        </div>
+        
+        <div>
+            <h3>32x32</h3>
+            <div class="logo size-32">
+                <div class="inner-box"></div>
+            </div>
+        </div>
+        
+        <div>
+            <h3>64x64</h3>
+            <div class="logo size-64">
+                <div class="inner-box"></div>
+            </div>
+        </div>
+        
+        <div>
+            <h3>128x128</h3>
+            <div class="logo size-128">
+                <div class="inner-box"></div>
+            </div>
+        </div>
+        
+        <div>
+            <h3>256x256</h3>
+            <div class="logo size-256">
+                <div class="inner-box"></div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
