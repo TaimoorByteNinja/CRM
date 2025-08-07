@@ -30,12 +30,14 @@ import {
   Palette,
   Globe,
   Layout,
+  LogOut,
 } from "lucide-react"
 import { InvoiceCustomizationDialog } from "@/components/InvoiceCustomizationDialog"
 import { PINSetupDialog } from "@/components/PINSetupDialog"
 import { formatCurrencyWithSymbol } from "@/lib/country-data"
 import { CountrySelectionOverlay } from "@/components/CountrySelectionOverlay"
 import { useSettings } from "@/hooks/use-settings"
+import { useAuth } from "@/lib/auth-context"
 
 // Simple currency formatting for preview
 const formatCurrency = (amount: number): string => {
@@ -48,6 +50,7 @@ const formatCurrency = (amount: number): string => {
 
 export default function SettingsPage() {
   const router = useRouter()
+  const { signOut } = useAuth()
   const [activeSection, setActiveSection] = useState("GENERAL")
   const [searchTerm, setSearchTerm] = useState("")
   const [showCountrySetup, setShowCountrySetup] = useState(false)
@@ -1542,6 +1545,14 @@ Regards,
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {loading ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    onClick={signOut}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Logout
                   </Button>
                 </div>
               </div>

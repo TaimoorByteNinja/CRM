@@ -22,6 +22,7 @@ import {
   Plus,
 } from "lucide-react"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import UserProfile from "./UserProfile"
 
 const navigationItems = [
   {
@@ -243,6 +244,11 @@ export function BusinessSidebar() {
           ))}
         </ul>
       </nav>
+      
+      {/* User Profile Section */}
+      <div className="p-3 border-t border-slate-700">
+        <UserProfile />
+      </div>
     </div>
   )
 }

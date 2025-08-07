@@ -27,13 +27,16 @@ import {
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { useAuth } from "@/lib/auth-context"
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+  const { signIn, signUp, signInWithOAuth } = useAuth()
 
   const [loginData, setLoginData] = useState({
     email: "",
@@ -63,37 +66,94 @@ export default function AuthPage() {
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const { error } = await signIn(loginData.email, loginData.password)
+      if (error) {
+        setError(error.message)
+      } else {
+        // Show success message before redirect
+        setError(null)
+        alert("Login successful! Redirecting to dashboard...")
+        // The auth context will handle the redirect to /business-hub
+      }
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
       setIsLoading(false)
-      router.push("/business-hub")
-    }, 2000)
+    }
   }
 
   const handleSignupSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (signupData.password !== signupData.confirmPassword) {
-      alert("Passwords don't match!")
+      setError("Passwords don't match!")
       return
     }
+    if (!signupData.agreeToTerms) {
+      setError("You must agree to the terms and conditions")
+      return
+    }
+    setError(null)
     setIsLoading(true)
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      const userData = {
+        first_name: signupData.firstName,
+        last_name: signupData.lastName,
+        company: signupData.company,
+        phone: signupData.phone,
+        subscribe_newsletter: signupData.subscribeNewsletter
+      }
+      
+      const { error, message } = await signUp(signupData.email, signupData.password, userData)
+      if (error) {
+        setError(error.message)
+      } else if (message) {
+        // Show success message and switch to login mode
+        setError(null)
+        alert(message) // You can replace this with a better UI notification
+        setIsLogin(true) // Switch to login mode
+        // Clear the signup form
+        setSignupData({
+          firstName: "",
+          lastName: "",
+          email: "",
+          company: "",
+          phone: "",
+          password: "",
+          confirmPassword: "",
+          agreeToTerms: false,
+          subscribeNewsletter: false,
+        })
+      } else {
+        // Direct signup success
+        router.push("/start-trial")
+      }
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
       setIsLoading(false)
-      router.push("/start-trial")
-    }, 2000)
+    }
   }
 
-  const handleSocialAuth = (provider: string) => {
+  const handleSocialAuth = async (provider: 'google' | 'github') => {
     setIsLoading(true)
-    // Simulate social auth
-    setTimeout(() => {
+    setError(null)
+    
+    try {
+      const { error } = await signInWithOAuth(provider)
+      if (error) {
+        setError(error.message)
+      }
+      // Success is handled by the auth context
+    } catch (err) {
+      setError("An unexpected error occurred")
+    } finally {
       setIsLoading(false)
-      router.push("/start-trial")
-    }, 1500)
+    }
   }
 
   return (
@@ -224,6 +284,13 @@ export default function AuthPage() {
                   </p>
                 </div>
 
+                {/* Error Display */}
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-3 mb-6">
+                    <p className="text-red-600 text-sm">{error}</p>
+                  </div>
+                )}
+
                 {/* Social Auth Buttons */}
                 <div className="space-y-3 mb-6">
                   <Button
@@ -315,7 +382,7 @@ export default function AuthPage() {
                           Remember me
                         </Label>
                       </div>
-                      <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
+                      <Link href="/auth/forgot-password" className="text-sm text-blue-600 hover:text-blue-500">
                         Forgot password?
                       </Link>
                     </div>
