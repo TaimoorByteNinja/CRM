@@ -44,9 +44,9 @@ next-env.d.ts
 dist/
 business-hub-installer.exe
 craft-crm-installer.exe
+*.exe
+/out/
 
-# Generated icons and assets
-*.ico
-*.png
-!public/*.png
-!public/*.ico
+# Electron build artifacts
+/dist/
+/build/
