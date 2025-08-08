@@ -1,8 +1,10 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
-  // Enable static exports for Electron
-  output: 'export',
+  // Conditional static export - only for production builds
+  ...(process.env.NODE_ENV === 'production' && process.env.STATIC_EXPORT === 'true' 
+    ? { output: 'export' } 
+    : {}),
   trailingSlash: true,
   
   // Ensure environment variables are available
@@ -19,7 +21,7 @@ const nextConfig: NextConfig = {
   
   // Handle images and static assets
   images: {
-    unoptimized: true, // Required for static export
+    unoptimized: true, // Required for static export when enabled
   },
   
   // Ensure proper handling of environment variables

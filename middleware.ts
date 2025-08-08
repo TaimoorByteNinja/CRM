@@ -4,6 +4,11 @@ import type { NextRequest } from 'next/server'
 import type { Database } from './lib/database.types'
 
 export async function middleware(req: NextRequest) {
+  // Skip middleware if static export is enabled
+  if (process.env.STATIC_EXPORT === 'true') {
+    return NextResponse.next()
+  }
+
   const res = NextResponse.next()
   const supabase = createMiddlewareClient<Database>({ req, res })
 

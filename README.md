@@ -1,51 +1,74 @@
-# customized-crm
+# Craft CRM
 
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+A comprehensive CRM system built with Next.js, Supabase, and Electron.
 
-## Getting Started
+## Build Configurations
 
-First, run the development server:
+This project supports multiple build configurations to handle different deployment scenarios:
 
+### Development Mode
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+bun run dev
 ```
+- Full middleware support
+- Server-side authentication
+- Hot reloading
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Server Build (Recommended for web deployment)
+```bash
+bun run build
+bun run start
+```
+- Full middleware support
+- Server-side authentication
+- API routes work normally
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Static Export (For Electron)
+```bash
+bun run build:static
+```
+- Client-side authentication only
+- No middleware (handled by client-side components)
+- Suitable for Electron apps
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Authentication
 
-## Learn More
+The project uses a hybrid authentication approach:
 
-To learn more about Next.js, take a look at the following resources:
+1. **Server-side authentication** (default): Uses Next.js middleware for route protection
+2. **Client-side authentication** (static export): Uses `ProtectedRoute` component for route protection
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Middleware Configuration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The middleware is conditionally enabled based on the `STATIC_EXPORT` environment variable:
 
-## Deploy on Vercel
+- When `STATIC_EXPORT=true`: Middleware is skipped, authentication handled client-side
+- When `STATIC_EXPORT` is not set: Full middleware authentication
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Protected Routes
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Protected routes are automatically handled by:
+- **Middleware** (server-side) when not using static export
+- **ProtectedRoute component** (client-side) when using static export
 
 ## Environment Variables
 
-Authentication and storage are powered by Supabase. Before running the project you must provide your Supabase URL and anon key.
+Required environment variables:
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-1. Copy `.env.local.example` to `.env.local`.
-2. Fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` with the values from your Supabase project.
-3. Restart the development server.
+Optional:
+- `STATIC_EXPORT=true` - Enables static export mode
 
-Without these variables the app will fail to start and throw a "Missing SUPABASE_URL environment variable" error.
+## Troubleshooting
+
+### Middleware Error with Static Export
+
+If you encounter the error "Middleware cannot be used with output: export", it means you're trying to use middleware with static export. Solutions:
+
+1. **Use server build**: Remove `output: 'export'` from `next.config.ts`
+2. **Use static export**: Set `STATIC_EXPORT=true` and rely on client-side authentication
+3. **Hybrid approach**: Use conditional configuration as implemented
 
 ## Running the Business Hub Desktop App
 
