@@ -84,11 +84,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })
     
-    // Since email verification is disabled, we'll treat all signups as successful
     if (data.user) {
-      return { 
-        error: null, 
-        message: "Account created successfully! You can now sign in." 
+      // Check if email confirmation is required
+      if (!data.user.email_confirmed_at) {
+        return { 
+          error: null, 
+          message: "Account created successfully! Please check your email and click the confirmation link before logging in." 
+        }
+      } else {
+        return { 
+          error: null, 
+          message: "Account created successfully! You can now sign in." 
+        }
       }
     }
     
@@ -101,14 +108,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password
     })
     
-    // If there's an error about email not confirmed, we'll ignore it since email verification is disabled
+    // Handle email confirmation error with a more helpful message
     if (error && error.message.includes('Email not confirmed')) {
-      // Try to sign in again without email verification
-      const { error: retryError } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
-      return { error: retryError }
+      return { 
+        error: {
+          ...error,
+          message: 'Please check your email and click the confirmation link before logging in. If you didn\'t receive the email, check your spam folder or contact support.'
+        }
+      }
     }
     
     return { error }

@@ -18,7 +18,13 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Craft CRM - Business Management System",
-  description: "A comprehensive business management system with sales, inventory, and financial tracking",
+  description:
+    "A comprehensive business management system with sales, inventory, and financial tracking",
+  icons: {
+    icon: "/icon.svg",
+    shortcut: "/icon.svg",
+    apple: "/icon.svg",
+  },
 };
 
 export default function RootLayout({
