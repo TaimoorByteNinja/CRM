@@ -25,6 +25,7 @@ import { useState, useEffect } from "react"
 import NextLink from "next/link"
 import { useTrialManagement } from "@/hooks/use-trial-management"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/lib/auth-context"
 
 export default function PricingPage() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
@@ -43,6 +44,7 @@ export default function PricingPage() {
     getAccessStatus,
     activatePremium
   } = useTrialManagement()
+  const { user } = useAuth()
 
   // Check if user came from trial expiry
   const fromTrial = searchParams.get('from') === 'trial'
@@ -54,27 +56,65 @@ export default function PricingPage() {
     }
   }, [fromTrial, trialInfo])
 
-  // Handle plan activation (demo function)
+  // If user just logged in and had a pending plan, resume checkout
+  useEffect(() => {
+    const resumeCheckout = async () => {
+      try {
+        const pending = sessionStorage.getItem('craftcrm_pending_plan')
+        if (!pending || !user) return
+        const { planId, planName, amount } = JSON.parse(pending)
+        sessionStorage.removeItem('craftcrm_pending_plan')
+        const res = await fetch('/api/stripe/create-checkout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planId, planName, amount }),
+        })
+        if (!res.ok) return
+        const data = await res.json()
+        if (data.url) window.location.href = data.url as string
+      } catch (e) {
+        console.error('Failed to resume checkout:', e)
+      }
+    }
+    resumeCheckout()
+  }, [user])
+
+  // Handle plan activation via Stripe Checkout
   const handlePlanActivation = async (planId: string, planName: string) => {
     setIsActivating(true)
     setSelectedPlan(planId)
-    
+
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 2000))
-      
-      // Activate premium subscription
-      const subscription = activatePremium(planId)
-      
-      // Show success message
-      alert(`🎉 ${planName} activated successfully!\n\nSubscription valid until: ${new Date(subscription.endDate).toLocaleDateString()}`)
-      
-      // Redirect to business hub
-      router.push('/business-hub')
-      
+      const selected = plans.find(p => p.id === planId)
+      const amount = selected ? calculatePrice(selected.annualPrice) : 0
+
+      const res = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, planName, amount }),
+      })
+
+      if (res.status === 401) {
+        // Persist intent and redirect to login
+        sessionStorage.setItem('craftcrm_pending_plan', JSON.stringify({ planId, planName, amount }))
+        router.push('/login?redirect=/pricing')
+        return
+      }
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        throw new Error(data.error || 'Failed to create checkout session')
+      }
+
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url as string
+        return
+      }
+      throw new Error('Invalid checkout session response')
     } catch (error) {
-      console.error('Failed to activate plan:', error)
-      alert('❌ Failed to activate plan. Please try again.')
+      console.error('Failed to start checkout:', error)
+      alert('❌ Could not start checkout. Please try again.')
     } finally {
       setIsActivating(false)
       setSelectedPlan(null)
